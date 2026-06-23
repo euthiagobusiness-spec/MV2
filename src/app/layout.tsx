@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Comfortaa, Geist_Mono } from "next/font/google";
 
 import "./globals.css";
 
-const geistSans = Geist({
+const comfortaa = Comfortaa({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  weight: ["400", "600", "700"],
 });
 
 const geistMono = Geist_Mono({
@@ -26,7 +27,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      className={`${geistSans.variable} ${geistMono.variable}`}
+      className={`${comfortaa.variable} ${geistMono.variable}`}
       data-scroll-behavior="smooth"
       lang="pt-BR"
     >

@@ -33,6 +33,17 @@ export function PropertyForm({ company, property }: PropertyFormProps) {
       slug: property?.slug ?? "",
       cover_image_url: property?.cover_image_url ?? "",
       gallery_images: toTextareaValue(property?.gallery_images),
+      short_description: property?.short_description ?? "",
+      virtual_tour_url: property?.virtual_tour_url ?? "",
+      apartment_video_url: property?.apartment_video_url ?? "",
+      condominium_video_url: property?.condominium_video_url ?? "",
+      youtube_embed_url: property?.youtube_embed_url ?? "",
+      map_embed_url: property?.map_embed_url ?? "",
+      guest_preview_enabled: property?.guest_preview_enabled ?? true,
+      show_wifi_on_preview: property?.show_wifi_on_preview ?? false,
+      condominium_description: property?.condominium_description ?? "",
+      condominium_gallery_images: toTextareaValue(property?.condominium_gallery_images),
+      condominium_amenities: toTextareaValue(property?.condominium_amenities),
       address: property?.address ?? "",
       condominium_name: property?.condominium_name ?? "",
       max_guests: property?.max_guests ?? 4,
@@ -139,6 +150,70 @@ export function PropertyForm({ company, property }: PropertyFormProps) {
         <Field error={errors.emergency_contacts?.message} label="Contatos de emergencia (JSON)">
           <textarea className="textarea font-mono text-xs" {...register("emergency_contacts")} />
         </Field>
+      </div>
+
+      <div className="card grid gap-4 p-5 md:grid-cols-2">
+        <div className="md:col-span-2">
+          <p className="text-sm font-black uppercase tracking-[0.14em] text-sky-700">
+            Experiencia do hospede
+          </p>
+          <h3 className="mt-1 text-xl font-black text-slate-950">
+            Previa publica, QR Code e tour visual
+          </h3>
+        </div>
+        <Field error={errors.short_description?.message} label="Descricao curta do apartamento">
+          <textarea className="textarea" {...register("short_description")} />
+        </Field>
+        <Field error={errors.condominium_description?.message} label="Descricao do condominio">
+          <textarea className="textarea" {...register("condominium_description")} />
+        </Field>
+        <Field error={errors.condominium_gallery_images?.message} label="Galeria da area externa/condominio">
+          <textarea
+            className="textarea"
+            placeholder="Uma URL por linha"
+            {...register("condominium_gallery_images")}
+          />
+        </Field>
+        <Field error={errors.condominium_amenities?.message} label="Comodidades do condominio">
+          <textarea
+            className="textarea"
+            placeholder="Uma comodidade por linha"
+            {...register("condominium_amenities")}
+          />
+        </Field>
+        <Field error={errors.virtual_tour_url?.message} label="Link de tour virtual 360">
+          <input className="input" {...register("virtual_tour_url")} />
+        </Field>
+        <Field error={errors.apartment_video_url?.message} label="Video do apartamento">
+          <input className="input" {...register("apartment_video_url")} />
+        </Field>
+        <Field error={errors.condominium_video_url?.message} label="Video do condominio">
+          <input className="input" {...register("condominium_video_url")} />
+        </Field>
+        <Field error={errors.youtube_embed_url?.message} label="Embed YouTube, Vimeo ou Matterport">
+          <input className="input" {...register("youtube_embed_url")} />
+        </Field>
+        <Field error={errors.map_embed_url?.message} label="Mapa incorporado">
+          <input className="input" {...register("map_embed_url")} />
+        </Field>
+        <div className="grid content-end gap-3">
+          <label className="flex items-center gap-3 text-sm font-bold text-slate-700">
+            <input
+              className="h-4 w-4 accent-sky-700"
+              type="checkbox"
+              {...register("guest_preview_enabled")}
+            />
+            Ativar pre-visualizacao publica
+          </label>
+          <label className="flex items-center gap-3 text-sm font-bold text-slate-700">
+            <input
+              className="h-4 w-4 accent-sky-700"
+              type="checkbox"
+              {...register("show_wifi_on_preview")}
+            />
+            Exibir Wi-Fi na pre-visualizacao
+          </label>
+        </div>
       </div>
 
       {message ? <p className="card p-4 font-semibold text-teal-900">{message}</p> : null}

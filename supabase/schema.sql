@@ -33,6 +33,17 @@ create table if not exists public.properties (
   slug text not null unique,
   cover_image_url text,
   gallery_images jsonb not null default '[]'::jsonb,
+  short_description text,
+  virtual_tour_url text,
+  apartment_video_url text,
+  condominium_video_url text,
+  youtube_embed_url text,
+  map_embed_url text,
+  guest_preview_enabled boolean not null default true,
+  show_wifi_on_preview boolean not null default false,
+  condominium_description text,
+  condominium_gallery_images jsonb not null default '[]'::jsonb,
+  condominium_amenities jsonb not null default '[]'::jsonb,
   address text not null,
   condominium_name text not null,
   max_guests integer not null default 1 check (max_guests > 0),
@@ -52,6 +63,19 @@ create table if not exists public.properties (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.properties
+  add column if not exists short_description text,
+  add column if not exists virtual_tour_url text,
+  add column if not exists apartment_video_url text,
+  add column if not exists condominium_video_url text,
+  add column if not exists youtube_embed_url text,
+  add column if not exists map_embed_url text,
+  add column if not exists guest_preview_enabled boolean not null default true,
+  add column if not exists show_wifi_on_preview boolean not null default false,
+  add column if not exists condominium_description text,
+  add column if not exists condominium_gallery_images jsonb not null default '[]'::jsonb,
+  add column if not exists condominium_amenities jsonb not null default '[]'::jsonb;
 
 create table if not exists public.reservations (
   id uuid primary key default gen_random_uuid(),
@@ -123,6 +147,10 @@ create table if not exists public.extra_services (
 
 create index if not exists properties_slug_idx on public.properties(slug);
 create index if not exists reservations_token_idx on public.reservations(guest_portal_token);
+create index if not exists reservations_guest_email_idx on public.reservations(guest_email);
+create index if not exists reservations_guest_phone_idx on public.reservations(guest_phone);
+create index if not exists reservations_external_code_idx on public.reservations(external_reservation_code);
+create index if not exists reservations_channel_idx on public.reservations(channel);
 create index if not exists reservations_checkin_date_idx on public.reservations(checkin_date);
 create index if not exists reservations_checkout_date_idx on public.reservations(checkout_date);
 create index if not exists guide_company_category_idx on public.local_guide_items(company_id, category, sort_order);

@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f7fbfb;
-  --foreground: #10201f;
-  --muted: #607271;
-  --line: #dbe8e6;
-  --brand: #0f766e;
-  --brand-strong: #134e4a;
-  --brand-soft: #ccfbf1;
-  --accent: #14b8a6;
+  --background: #f8fbff;
+  --foreground: #132433;
+  --muted: #5f7282;
+  --line: #d8e3ec;
+  --brand: #0b6fae;
+  --brand-strong: #0b3b5a;
+  --brand-soft: #e6f5ff;
+  --accent: #22a6d5;
   --surface: #ffffff;
   --danger: #be123c;
 }
@@ -31,10 +31,10 @@ html {
 body {
   min-height: 100vh;
   background:
-    radial-gradient(circle at top left, rgba(20, 184, 166, 0.16), transparent 34rem),
-    linear-gradient(180deg, #f7fbfb 0%, #eef8f7 100%);
+    radial-gradient(circle at top left, rgba(34, 166, 213, 0.14), transparent 34rem),
+    linear-gradient(180deg, #f8fbff 0%, #edf6fb 100%);
   color: var(--foreground);
-  font-family: var(--font-geist-sans);
+  font-family: "Comfortaa", var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
 a {
@@ -85,7 +85,7 @@ select {
 .textarea:focus,
 .select:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.14);
+  box-shadow: 0 0 0 4px rgba(34, 166, 213, 0.14);
 }
 
 .btn {
@@ -109,7 +109,7 @@ select {
 
 .btn-primary {
   background: var(--brand);
-  box-shadow: 0 12px 30px rgba(15, 118, 110, 0.22);
+  box-shadow: 0 12px 30px rgba(11, 111, 174, 0.22);
   color: #ffffff;
 }
 
@@ -118,7 +118,7 @@ select {
 }
 
 .btn-secondary {
-  background: #e7f7f5;
+  background: #e6f5ff;
   color: var(--brand-strong);
 }
 
@@ -132,10 +132,10 @@ select {
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid var(--line);
   border-radius: 0.75rem;
-  box-shadow: 0 18px 60px rgba(19, 78, 74, 0.08);
+  box-shadow: 0 18px 60px rgba(11, 59, 90, 0.08);
 }
 
 .admin-shell {
-  background: #f4faf9;
+  background: #f4f9fd;
   min-height: 100vh;
 }

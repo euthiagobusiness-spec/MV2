@@ -52,6 +52,17 @@ export type Property = {
   slug: string;
   cover_image_url: string | null;
   gallery_images: string[];
+  short_description?: string | null;
+  virtual_tour_url?: string | null;
+  apartment_video_url?: string | null;
+  condominium_video_url?: string | null;
+  youtube_embed_url?: string | null;
+  map_embed_url?: string | null;
+  guest_preview_enabled?: boolean;
+  show_wifi_on_preview?: boolean;
+  condominium_description?: string | null;
+  condominium_gallery_images?: string[];
+  condominium_amenities?: string[];
   address: string;
   condominium_name: string;
   max_guests: number;

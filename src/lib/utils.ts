@@ -50,11 +50,16 @@ export function getBaseUrl() {
     return `https://${process.env.VERCEL_URL}`;
   }
 
-  return "http://localhost:3000";
+  return "http://localhost:5004";
 }
 
 export function portalUrl(token: string) {
   return `${getBaseUrl()}/portal/${token}`;
+}
+
+export function publicUrl(path: string) {
+  const normalized = path.startsWith("/") ? path : `/${path}`;
+  return `${getBaseUrl()}${normalized}`;
 }
 
 export function createPortalToken() {

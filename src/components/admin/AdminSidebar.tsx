@@ -4,6 +4,7 @@ import {
   CalendarDays,
   ClipboardCheck,
   ConciergeBell,
+  QrCode,
   LayoutDashboard,
   Map,
   Settings,
@@ -16,6 +17,7 @@ const links = [
   { href: "/admin/checkins", label: "Check-ins", icon: ClipboardCheck },
   { href: "/admin/local-guide", label: "Guia local", icon: Map },
   { href: "/admin/extras", label: "Extras", icon: ConciergeBell },
+  { href: "/admin/guest-experience", label: "Experiencia do hospede", icon: QrCode },
   { href: "/admin/settings", label: "Configuracoes", icon: Settings },
 ];
 
