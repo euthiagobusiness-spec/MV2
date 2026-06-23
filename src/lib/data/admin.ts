@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { demoAdminDataset } from "@/lib/mock-data";
-import { isSupabaseConfigured } from "@/lib/env";
+import { isAdminEmailAllowed, isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import type {
   AdminDataset,
@@ -32,15 +32,19 @@ export const requireAdmin = cache(async (): Promise<AdminUser> => {
   }
 
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.getClaims();
+  const { data, error } = await supabase.auth.getUser();
 
-  if (error || !data?.claims?.sub) {
+  if (error || !data?.user?.id) {
     redirect("/admin/login");
   }
 
+  if (!isAdminEmailAllowed(data.user.email)) {
+    redirect("/admin/login?unauthorized=1");
+  }
+
   return {
-    id: data.claims.sub,
-    email: String(data.claims.email ?? "admin"),
+    id: data.user.id,
+    email: data.user.email ?? "admin",
     isDemo: false,
   };
 });

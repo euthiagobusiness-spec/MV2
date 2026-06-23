@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import Link from "next/link";
 import { LockKeyhole, Mail } from "lucide-react";
 
 import { loginAction } from "@/lib/actions/auth";
@@ -25,8 +26,8 @@ export default function AdminLoginPage() {
             Painel administrativo
           </h1>
           <p className="mt-2 text-slate-600">
-            Entre com Supabase Auth. Sem `.env.local`, qualquer e-mail/senha
-            valida abre o modo demonstracao.
+            Entre com uma conta autorizada. Cadastros novos precisam de liberacao
+            administrativa antes de acessar dados sensiveis.
           </p>
         </div>
 
@@ -38,7 +39,6 @@ export default function AdminLoginPage() {
               <input
                 autoComplete="email"
                 className="input pl-10"
-                defaultValue="admin@mv2temporada.com.br"
                 name="email"
                 type="email"
               />
@@ -58,7 +58,6 @@ export default function AdminLoginPage() {
               <input
                 autoComplete="current-password"
                 className="input pl-10"
-                defaultValue="mv2demo"
                 name="password"
                 type="password"
               />
@@ -77,6 +76,16 @@ export default function AdminLoginPage() {
           <button className="btn btn-primary" disabled={pending} type="submit">
             Entrar
           </button>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm font-semibold">
+            <Link className="text-teal-800 hover:text-teal-950" href="/admin/register">
+              Criar novo login
+            </Link>
+            <div className="flex gap-3 text-slate-500">
+              <Link href="/privacy">Privacidade</Link>
+              <Link href="/terms">Termos</Link>
+            </div>
+          </div>
         </form>
       </div>
     </main>

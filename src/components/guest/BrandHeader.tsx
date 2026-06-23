@@ -21,6 +21,8 @@ export function BrandHeader() {
       <nav className="hidden items-center gap-6 text-sm font-bold text-slate-600 md:flex">
         <Link href="/select-property">Apartamentos</Link>
         <Link href="/guest-access#reservation-login">Minha reserva</Link>
+        <Link href="/privacy">Privacidade</Link>
+        <Link href="/terms">Termos</Link>
         <Link href="/admin/login">Painel</Link>
       </nav>
     </header>

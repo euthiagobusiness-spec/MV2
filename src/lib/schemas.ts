@@ -2,8 +2,34 @@ import { z } from "zod";
 
 export const loginSchema = z.object({
   email: z.string().email("Informe um e-mail valido."),
-  password: z.string().min(6, "A senha deve ter pelo menos 6 caracteres."),
+  password: z.string().min(10, "A senha deve ter pelo menos 10 caracteres."),
 });
+
+export const strongPasswordSchema = z
+  .string()
+  .min(10, "Use pelo menos 10 caracteres.")
+  .regex(/[a-z]/, "Inclua uma letra minuscula.")
+  .regex(/[A-Z]/, "Inclua uma letra maiuscula.")
+  .regex(/\d/, "Inclua um numero.")
+  .regex(/[^A-Za-z0-9]/, "Inclua um simbolo.");
+
+export const registerSchema = z
+  .object({
+    name: z.string().min(3, "Informe seu nome completo."),
+    email: z.string().email("Informe um e-mail valido."),
+    password: strongPasswordSchema,
+    confirm_password: z.string().min(1, "Confirme a senha."),
+    accepted_terms: z.coerce
+      .boolean()
+      .refine((value) => value, "Aceite os termos para continuar."),
+    accepted_privacy_policy: z.coerce
+      .boolean()
+      .refine((value) => value, "Aceite a politica de privacidade."),
+  })
+  .refine((data) => data.password === data.confirm_password, {
+    message: "As senhas nao conferem.",
+    path: ["confirm_password"],
+  });
 
 export const checkinSchema = z.object({
   responsible_guest_name: z
@@ -128,3 +154,4 @@ export const companySchema = z.object({
 export type CheckinInput = z.input<typeof checkinSchema>;
 export type PropertyInput = z.input<typeof propertySchema>;
 export type ReservationInput = z.input<typeof reservationSchema>;
+export type RegisterInput = z.input<typeof registerSchema>;

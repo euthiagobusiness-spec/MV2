@@ -145,6 +145,28 @@ create table if not exists public.extra_services (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.admin_profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  email text not null unique,
+  role text not null default 'admin' check (role in ('admin', 'operator')),
+  created_at timestamptz not null default now()
+);
+
+create or replace function public.is_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.admin_profiles
+    where id = (select auth.uid())
+      and role in ('admin', 'operator')
+  );
+$$;
+
 create index if not exists properties_slug_idx on public.properties(slug);
 create index if not exists reservations_token_idx on public.reservations(guest_portal_token);
 create index if not exists reservations_guest_email_idx on public.reservations(guest_email);
@@ -187,6 +209,7 @@ alter table public.reservations enable row level security;
 alter table public.guest_checkins enable row level security;
 alter table public.local_guide_items enable row level security;
 alter table public.extra_services enable row level security;
+alter table public.admin_profiles enable row level security;
 
 grant usage on schema public to authenticated, service_role;
 grant select, insert, update, delete on public.companies to authenticated, service_role;
@@ -195,54 +218,64 @@ grant select, insert, update, delete on public.reservations to authenticated, se
 grant select, insert, update, delete on public.guest_checkins to authenticated, service_role;
 grant select, insert, update, delete on public.local_guide_items to authenticated, service_role;
 grant select, insert, update, delete on public.extra_services to authenticated, service_role;
+grant select on public.admin_profiles to authenticated, service_role;
+revoke execute on function public.is_admin() from public, anon;
+grant execute on function public.is_admin() to authenticated, service_role;
+
+drop policy if exists "admins read own profile" on public.admin_profiles;
+create policy "admins read own profile"
+on public.admin_profiles
+for select
+to authenticated
+using ((select auth.uid()) = id);
 
 drop policy if exists "admins manage companies" on public.companies;
 create policy "admins manage companies"
 on public.companies
 for all
 to authenticated
-using (true)
-with check (true);
+using (public.is_admin())
+with check (public.is_admin());
 
 drop policy if exists "admins manage properties" on public.properties;
 create policy "admins manage properties"
 on public.properties
 for all
 to authenticated
-using (true)
-with check (true);
+using (public.is_admin())
+with check (public.is_admin());
 
 drop policy if exists "admins manage reservations" on public.reservations;
 create policy "admins manage reservations"
 on public.reservations
 for all
 to authenticated
-using (true)
-with check (true);
+using (public.is_admin())
+with check (public.is_admin());
 
 drop policy if exists "admins manage guest checkins" on public.guest_checkins;
 create policy "admins manage guest checkins"
 on public.guest_checkins
 for all
 to authenticated
-using (true)
-with check (true);
+using (public.is_admin())
+with check (public.is_admin());
 
 drop policy if exists "admins manage guide items" on public.local_guide_items;
 create policy "admins manage guide items"
 on public.local_guide_items
 for all
 to authenticated
-using (true)
-with check (true);
+using (public.is_admin())
+with check (public.is_admin());
 
 drop policy if exists "admins manage extra services" on public.extra_services;
 create policy "admins manage extra services"
 on public.extra_services
 for all
 to authenticated
-using (true)
-with check (true);
+using (public.is_admin())
+with check (public.is_admin());
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('property-images', 'property-images', true, 5242880, array['image/png', 'image/jpeg', 'image/webp'])
@@ -263,19 +296,19 @@ create policy "authenticated uploads property images"
 on storage.objects
 for insert
 to authenticated
-with check (bucket_id = 'property-images');
+with check (bucket_id = 'property-images' and public.is_admin());
 
 drop policy if exists "authenticated updates property images" on storage.objects;
 create policy "authenticated updates property images"
 on storage.objects
 for update
 to authenticated
-using (bucket_id = 'property-images')
-with check (bucket_id = 'property-images');
+using (bucket_id = 'property-images' and public.is_admin())
+with check (bucket_id = 'property-images' and public.is_admin());
 
 drop policy if exists "authenticated deletes property images" on storage.objects;
 create policy "authenticated deletes property images"
 on storage.objects
 for delete
 to authenticated
-using (bucket_id = 'property-images');
+using (bucket_id = 'property-images' and public.is_admin());

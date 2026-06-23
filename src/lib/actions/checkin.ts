@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { hasSupabaseAdminKey, isSupabaseConfigured } from "@/lib/env";
 import { checkinSchema, type CheckinInput } from "@/lib/schemas";
+import { containsSensitiveFreeText } from "@/lib/security/sensitive-data";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { ActionState } from "@/lib/types";
 import { parseLines } from "@/lib/utils";
@@ -28,6 +29,14 @@ export async function submitGuestCheckinAction(
     companion_names: parseLines(parsed.data.companion_names),
     observations: parsed.data.observations?.trim() || null,
   };
+
+  if (containsSensitiveFreeText(payload.observations)) {
+    return {
+      ok: false,
+      message:
+        "Remova senhas, cartoes, tokens ou chaves do campo de observacoes antes de enviar.",
+    };
+  }
 
   if (!isSupabaseConfigured()) {
     revalidatePath(`/portal/${token}`);
