@@ -18,6 +18,23 @@ Sem variaveis Supabase, o app roda em modo demonstracao. Acesse:
 
 No modo demo, o login aceita o exemplo exibido na tela.
 
+## Verificacao operacional diaria
+
+A rotina diaria fica em:
+
+- `http://localhost:5004/verificacao-operacional`
+
+Ela salva o progresso no navegador imediatamente e tambem grava historico local em `data/operational-verifications.json` quando a API esta rodando. Para e-mails automaticos de inicio, problema e conclusao, configure no `.env.local`:
+
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_USER`
+- `SMTP_PASS`
+- `EMAIL_FROM`
+- `EMAIL_TO`
+
+Se o SMTP falhar ou nao estiver configurado, a verificacao continua sendo salva.
+
 ## Configurar Supabase
 
 1. Crie um projeto no Supabase.

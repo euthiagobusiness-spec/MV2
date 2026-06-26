@@ -15,6 +15,7 @@ const links = [
   { href: "/admin/properties", label: "Imoveis", icon: Building2 },
   { href: "/admin/reservations", label: "Reservas", icon: CalendarDays },
   { href: "/admin/checkins", label: "Check-ins", icon: ClipboardCheck },
+  { href: "/verificacao-operacional", label: "Verificacao diaria", icon: ClipboardCheck },
   { href: "/admin/local-guide", label: "Guia local", icon: Map },
   { href: "/admin/extras", label: "Extras", icon: ConciergeBell },
   { href: "/admin/guest-experience", label: "Experiencia do hospede", icon: QrCode },
