@@ -120,7 +120,7 @@ const baseProperty = {
   wifi_name: "MV2-Maranduba",
   wifi_password: "Disponivel apenas no portal da reserva",
   parking_info:
-    "Uma vaga por apartamento. Informe a placa no pre-check-in e respeite a vaga indicada.",
+    "Uma vaga por apartamento. Informe a placa no pre-check-in, respeite a vaga indicada e solicite vagas extras pelo chat.",
   access_instructions:
     "As instrucoes completas de entrada ficam protegidas no portal da reserva e sao liberadas proximo ao check-in.",
   house_rules: [
@@ -130,7 +130,7 @@ const baseProperty = {
     "Cuide dos itens do apartamento como se fossem seus.",
   ],
   condominium_rules: [
-    "Piscina conforme horario e regras do condominio.",
+    "Piscina disponivel das 8h as 20h, conforme as regras do condominio.",
     "Visitantes somente com autorizacao previa.",
     "Nao use vidro na area da piscina.",
     "Descarte o lixo nos pontos indicados.",

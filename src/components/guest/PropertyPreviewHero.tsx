@@ -12,8 +12,8 @@ export function PropertyPreviewHero({ property }: { property: Property }) {
 
   return (
     <section className="mx-auto max-w-7xl px-5 pb-10 pt-4 lg:px-8">
-      <div className="grid overflow-hidden rounded-2xl bg-white shadow-lg lg:grid-cols-[1.05fr_0.95fr]">
-        <div className="relative min-h-[380px] bg-slate-100">
+      <div className="grid min-w-0 overflow-hidden rounded-2xl bg-white shadow-lg lg:grid-cols-[1.05fr_0.95fr]">
+        <div className="relative min-h-[380px] min-w-0 bg-slate-100">
           {property.cover_image_url ? (
             <img
               alt={property.name}
@@ -26,15 +26,15 @@ export function PropertyPreviewHero({ property }: { property: Property }) {
             Praia do Sape - Maranduba
           </div>
         </div>
-        <div className="grid content-center gap-6 p-6 lg:p-10">
-          <div>
+        <div className="grid min-w-0 content-center gap-6 p-6 lg:p-10">
+          <div className="min-w-0">
             <p className="text-sm font-black uppercase tracking-[0.16em] text-sky-700">
               Previa publica do apartamento
             </p>
             <h1 className="mt-2 text-4xl font-black text-slate-950 lg:text-5xl">
               {property.name}
             </h1>
-            <p className="mt-4 text-lg leading-8 text-slate-600">
+            <p className="mt-4 break-words text-lg leading-8 text-slate-600">
               {property.short_description}
             </p>
           </div>
@@ -65,9 +65,9 @@ function Badge({
   label: string;
 }) {
   return (
-    <span className="flex items-center gap-2 rounded-xl bg-slate-50 p-3 text-sm font-bold text-slate-700">
+    <span className="flex min-w-0 items-center gap-2 rounded-xl bg-slate-50 p-3 text-sm font-bold text-slate-700">
       {Icon ? <Icon size={18} /> : null}
-      {label}
+      <span className="min-w-0 break-words">{label}</span>
     </span>
   );
 }

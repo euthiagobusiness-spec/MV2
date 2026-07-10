@@ -45,17 +45,17 @@ export function PortalHero({ company, property, reservation }: PortalHeroProps) 
           <WhatsAppButton
             className="hidden sm:inline-flex"
             label="Suporte"
-            message={`Ola, sou ${reservation.guest_name} e preciso de ajuda com a reserva ${reservation.external_reservation_code ?? reservation.id}.`}
+            message={`Ola, preciso de ajuda com a reserva ${reservation.external_reservation_code ?? reservation.id}.`}
             phone={company.whatsapp}
           />
         </nav>
 
         <div className="pb-8">
           <p className="inline-flex rounded-full bg-white/14 px-3 py-1 text-sm font-bold backdrop-blur">
-            Portal exclusivo da sua reserva
+            Portal da reserva
           </p>
           <h1 className="mt-4 max-w-3xl text-4xl font-black tracking-tight sm:text-6xl">
-            Bem-vindo(a), {reservation.guest_name}
+            Boas-vindas a Maranduba
           </h1>
           <p className="mt-4 max-w-2xl text-lg leading-8 text-white/82">
             Aqui estao check-in digital, chegada, Wi-Fi, regras, guia local,

@@ -1,16 +1,16 @@
 import { notFound } from "next/navigation";
 import {
-  Car,
   Clock,
-  ExternalLink,
   Home,
-  KeyRound,
   Mail,
-  MapPinned,
   Phone,
   Sparkles,
 } from "lucide-react";
 
+import { ArrivalGuide } from "@/components/guest/ArrivalGuide";
+import { NeighborhoodGuide } from "@/components/guest/NeighborhoodGuide";
+import { StayEssentials } from "@/components/guest/StayEssentials";
+import { WelcomeMessage } from "@/components/guest/WelcomeMessage";
 import { CheckinForm } from "@/components/portal/CheckinForm";
 import { ExtraServiceCard } from "@/components/portal/ExtraServiceCard";
 import { LocalGuideCard } from "@/components/portal/LocalGuideCard";
@@ -19,7 +19,6 @@ import { PortalSection } from "@/components/portal/PortalSection";
 import { RulesCard } from "@/components/portal/RulesCard";
 import { WhatsAppButton } from "@/components/portal/WhatsAppButton";
 import { WifiCard } from "@/components/portal/WifiCard";
-import { CopyButton } from "@/components/ui/CopyButton";
 import { getPortalPayload } from "@/lib/data/portal";
 import { formatDate, whatsappUrl } from "@/lib/utils";
 
@@ -53,10 +52,12 @@ export default async function PortalPage({ params }: PortalPageProps) {
         <div className="mx-auto flex max-w-6xl gap-2 overflow-x-auto px-5 py-3 text-sm font-bold text-slate-600 lg:px-8">
           {[
             ["#checkin", "Check-in"],
+            ["#essenciais", "Informacoes essenciais"],
             ["#chegada", "Como chegar"],
             ["#wifi", "Wi-Fi"],
             ["#manual", "Manual"],
             ["#regras", "Regras"],
+            ["#bairro", "Maranduba"],
             ["#guia", "Guia local"],
             ["#extras", "Extras"],
           ].map(([href, label]) => (
@@ -70,10 +71,11 @@ export default async function PortalPage({ params }: PortalPageProps) {
       <div className="mx-auto max-w-6xl px-5 py-8 lg:px-8">
         <PortalSection
           eyebrow="Boas-vindas"
-          title={`Sua estadia em ${property.name}`}
-          description="Este portal foi criado para reduzir esperas e duvidas. Salve este link: ele reune dados de entrada, Wi-Fi, regras, manual do apartamento, guia local, extras e contatos uteis."
+          title={`Estadia no ${property.name}`}
+          description="Informacoes organizadas para uma chegada tranquila e uma experiencia mais pratica em Maranduba."
         >
-          <div className="grid gap-4 md:grid-cols-3">
+          <WelcomeMessage />
+          <div className="mt-4 grid gap-4 md:grid-cols-3">
             <InfoCard
               icon={<Home size={22} />}
               label="Apartamento"
@@ -107,49 +109,20 @@ export default async function PortalPage({ params }: PortalPageProps) {
           />
         </PortalSection>
 
-        <PortalSection id="chegada" title="Como chegar">
-          <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-            <div className="card p-5">
-              <MapPinned className="text-teal-700" size={24} />
-              <h3 className="mt-3 text-xl font-black text-teal-950">Endereco</h3>
-              <p className="mt-2 leading-7 text-slate-700">{property.address}</p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <a
-                  className="btn btn-secondary"
-                  href={`https://maps.google.com/?q=${encodeURIComponent(
-                    property.address,
-                  )}`}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  <ExternalLink size={17} />
-                  Abrir Google Maps
-                </a>
-                <CopyButton label="Copiar endereco" value={property.address} />
-              </div>
-            </div>
+        <PortalSection
+          description="Pontos que valem ser conferidos antes de preparar a viagem."
+          id="essenciais"
+          title="Informacoes essenciais"
+        >
+          <StayEssentials property={property} />
+        </PortalSection>
 
-            <div className="card grid gap-4 p-5">
-              <div className="flex gap-3">
-                <KeyRound className="mt-1 shrink-0 text-teal-700" size={22} />
-                <div>
-                  <h3 className="font-black text-teal-950">Entrada</h3>
-                  <p className="mt-1 leading-7 text-slate-700">
-                    {property.access_instructions}
-                  </p>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <Car className="mt-1 shrink-0 text-teal-700" size={22} />
-                <div>
-                  <h3 className="font-black text-teal-950">Estacionamento</h3>
-                  <p className="mt-1 leading-7 text-slate-700">
-                    {property.parking_info}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+        <PortalSection
+          description="Use a rota recomendada e conclua os dados de acesso com antecedencia."
+          id="chegada"
+          title="Como chegar e acessar o condominio"
+        >
+          <ArrivalGuide property={property} />
         </PortalSection>
 
         <PortalSection id="horarios" title="Check-in e check-out">
@@ -202,6 +175,14 @@ export default async function PortalPage({ params }: PortalPageProps) {
 
         <PortalSection title="Regras do condominio">
           <RulesCard items={property.condominium_rules} />
+        </PortalSection>
+
+        <PortalSection
+          description="Praia, natureza, comercio e lazer reunidos na regiao sul de Ubatuba."
+          id="bairro"
+          title="Sobre Maranduba"
+        >
+          <NeighborhoodGuide />
         </PortalSection>
 
         <PortalSection
