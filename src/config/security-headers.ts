@@ -1,11 +1,20 @@
 const isDev = process.env.NODE_ENV !== "production";
 
-function createContentSecurityPolicy(allowBlobScripts = false) {
+type ContentSecurityPolicyOptions = {
+  allowBlobScripts?: boolean;
+  allowUnsafeEval?: boolean;
+};
+
+function createContentSecurityPolicy({
+  allowBlobScripts = false,
+  allowUnsafeEval = isDev,
+}: ContentSecurityPolicyOptions = {}) {
   const blobScriptSource = allowBlobScripts ? " blob:" : "";
+  const unsafeEvalSource = allowUnsafeEval ? " 'unsafe-eval'" : "";
 
   return [
     "default-src 'self'",
-    `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${blobScriptSource}${isDev ? " 'unsafe-eval'" : ""}`,
+    `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${blobScriptSource}${unsafeEvalSource}`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com",
     "font-src 'self' data: https://fonts.gstatic.com",
@@ -21,7 +30,10 @@ function createContentSecurityPolicy(allowBlobScripts = false) {
   ].join("; ");
 }
 
-export const tourContentSecurityPolicy = createContentSecurityPolicy(true);
+export const tourContentSecurityPolicy = createContentSecurityPolicy({
+  allowBlobScripts: true,
+  allowUnsafeEval: true,
+});
 
 export const securityHeaders = [
   {
