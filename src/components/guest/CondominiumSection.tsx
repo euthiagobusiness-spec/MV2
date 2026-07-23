@@ -1,4 +1,5 @@
-import { CheckCircle2 } from "lucide-react";
+import Link from "next/link";
+import { Box, CheckCircle2 } from "lucide-react";
 
 import type { Property } from "@/lib/types";
 
@@ -25,6 +26,13 @@ export function CondominiumSection({ property }: { property: Property }) {
               </span>
             ))}
           </div>
+          <Link
+            className="btn mt-7 w-fit border-white/30 bg-white text-slate-950 hover:bg-sky-50"
+            href="/tour-condominio"
+          >
+            <Box size={18} />
+            Explorar condominio em 3D
+          </Link>
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
           {images.slice(0, 6).map((image, index) => (

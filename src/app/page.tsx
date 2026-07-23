@@ -1,11 +1,11 @@
 import Link from "next/link";
 import {
   ArrowRight,
+  Box,
   CalendarDays,
   MapPin,
   MessageCircle,
   Search,
-  Users,
 } from "lucide-react";
 
 import { BrandHeader } from "@/components/guest/BrandHeader";
@@ -137,7 +137,7 @@ export default async function Home() {
           </div>
           <Link
             className="group grid overflow-hidden rounded-2xl bg-slate-950 shadow-lg sm:grid-cols-3"
-            href="/select-property#condominio"
+            href="/tour-condominio"
           >
             {condominiumImages.slice(0, 6).map((image, index) => (
               <div className="relative aspect-[4/3] overflow-hidden" key={image}>
@@ -149,8 +149,8 @@ export default async function Home() {
                 {index === 0 ? (
                   <div className="absolute inset-0 grid place-items-center bg-slate-950/40 text-center text-white">
                     <div>
-                      <Users className="mx-auto" size={28} />
-                      <p className="mt-2 font-black">Tour do condominio</p>
+                      <Box className="mx-auto" size={28} />
+                      <p className="mt-2 font-black">Tour 3D interativo</p>
                     </div>
                   </div>
                 ) : null}
