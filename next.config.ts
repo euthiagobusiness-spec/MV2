@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
-import { securityHeaders } from "./src/config/security-headers";
+import {
+  securityHeaders,
+  tourContentSecurityPolicy,
+} from "./src/config/security-headers";
 
 const nextConfig: NextConfig = {
   turbopack: {
@@ -11,6 +14,15 @@ const nextConfig: NextConfig = {
       {
         source: "/:path*",
         headers: securityHeaders,
+      },
+      {
+        source: "/tour-condominio",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: tourContentSecurityPolicy,
+          },
+        ],
       },
       {
         source: "/models/:path*",

@@ -1,26 +1,32 @@
 const isDev = process.env.NODE_ENV !== "production";
 
-const cspDirectives = [
-  "default-src 'self'",
-  `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${isDev ? " 'unsafe-eval'" : ""}`,
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com",
-  "font-src 'self' data: https://fonts.gstatic.com",
-  "connect-src 'self' blob: https://*.supabase.co wss://*.supabase.co",
-  "worker-src 'self' blob:",
-  "frame-src 'self' https://www.youtube.com https://player.vimeo.com https://my.matterport.com https://www.google.com",
-  "media-src 'self' https:",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-  "upgrade-insecure-requests",
-];
+function createContentSecurityPolicy(allowBlobScripts = false) {
+  const blobScriptSource = allowBlobScripts ? " blob:" : "";
+
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${blobScriptSource}${isDev ? " 'unsafe-eval'" : ""}`,
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com",
+    "font-src 'self' data: https://fonts.gstatic.com",
+    "connect-src 'self' blob: https://*.supabase.co wss://*.supabase.co",
+    "worker-src 'self' blob:",
+    "frame-src 'self' https://www.youtube.com https://player.vimeo.com https://my.matterport.com https://www.google.com",
+    "media-src 'self' https:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    "upgrade-insecure-requests",
+  ].join("; ");
+}
+
+export const tourContentSecurityPolicy = createContentSecurityPolicy(true);
 
 export const securityHeaders = [
   {
     key: "Content-Security-Policy",
-    value: cspDirectives.join("; "),
+    value: createContentSecurityPolicy(),
   },
   {
     key: "Strict-Transport-Security",
