@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { KTX2Loader } from "three/examples/jsm/loaders/KTX2Loader.js";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 
 import {
@@ -15,7 +16,6 @@ import type {
   NormalizedTourPoint,
   TourDestination,
   TourMode,
-  TourQuality,
   VerticalDirection,
   WalkDirection,
 } from "@/components/tour/tour-types";
@@ -44,24 +44,22 @@ type TourEngine = {
   cancelNavigation: () => void;
   navigateTo: (destination: TourDestination) => void;
   reset: (mode: TourMode) => void;
+  setMobileMovement: (right: number, forward: number) => void;
   setMode: (mode: TourMode) => void;
   setRunEnabled: (enabled: boolean) => void;
   setVerticalDirection: (
     direction: VerticalDirection,
     active: boolean,
   ) => void;
-  setWalkDirection: (direction: WalkDirection, active: boolean) => void;
 };
 
 const MODEL_URL =
-  "/models/condominio-mv2/condominio-mv2-7c5adb14.glb";
+  "/models/condominio-mv2/condominio-mv2-completo-c866bf2b.glb";
 const WALK_EYE_HEIGHT = 1.72;
-const WALK_SPEED_METERS_PER_SECOND = 2.4;
-const gateMeshNames = new Set([
-  "Geom3D_91",
-  "Geom3D_93",
-  "Geom3D_95",
-]);
+const BASE_WALK_SPEED_METERS_PER_SECOND = 2.4;
+const WALK_SPEED_MULTIPLIER = 5;
+const RUN_SPEED_MULTIPLIER = 10;
+const AUTOMATIC_ROUTE_SPEED_MULTIPLIER = 2.5;
 
 const keyDirections: Partial<Record<string, WalkDirection>> = {
   ArrowDown: "backward",
@@ -130,7 +128,6 @@ export function useCondominiumTour() {
   const [isRunning, setIsRunning] = useState(false);
   const [loadProgress, setLoadProgress] = useState(0);
   const [mode, setMode] = useState<TourMode>("walk");
-  const [quality] = useState<TourQuality>("full");
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -171,34 +168,32 @@ export function useCondominiumTour() {
     let raycastBounds: THREE.Box3 | null = null;
     let navigation: NavigationState | null = null;
     let runEnabled = false;
+    let touchForwardAmount = 0;
+    let touchRightAmount = 0;
     let walkHeightOffset = 0;
     let walkPitch = 0;
     let walkYaw = 0;
 
     const keyboardDirections = new Set<WalkDirection>();
     const keyboardVerticalDirections = new Set<VerticalDirection>();
-    const touchDirections: Record<WalkDirection, boolean> = {
-      backward: false,
-      forward: false,
-      left: false,
-      right: false,
-    };
     const touchVerticalDirections: Record<VerticalDirection, boolean> = {
       down: false,
       up: false,
     };
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xdcecf1);
+    scene.background = new THREE.Color(0xaedff2);
 
     const camera = new THREE.PerspectiveCamera(54, 1, 0.08, 2000);
     camera.position.set(80, 60, 90);
     camera.rotation.order = "YXZ";
 
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.AgXToneMapping;
-    renderer.toneMappingExposure = 1.05;
-    renderer.shadowMap.enabled = false;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.28;
+    renderer.shadowMap.enabled = !mobileDevice;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.autoUpdate = false;
     renderer.domElement.className = "block h-full w-full touch-none";
     renderer.domElement.tabIndex = 0;
     renderer.domElement.setAttribute(
@@ -218,19 +213,31 @@ export function useCondominiumTour() {
     pmremGenerator.dispose();
 
     const hemisphereLight = new THREE.HemisphereLight(
-      0xf7fbff,
-      0x6a7468,
-      1.55,
+      0xf8fdff,
+      0x65735a,
+      1.85,
     );
     scene.add(hemisphereLight);
 
-    const sunLight = new THREE.DirectionalLight(0xfff4e4, 2.15);
-    sunLight.position.set(90, 150, 65);
+    const sunLight = new THREE.DirectionalLight(0xfff1d6, 3.1);
+    sunLight.position.set(105, 165, 82);
+    sunLight.castShadow = !mobileDevice;
+    sunLight.shadow.mapSize.set(2048, 2048);
+    sunLight.shadow.camera.left = -165;
+    sunLight.shadow.camera.right = 165;
+    sunLight.shadow.camera.top = 165;
+    sunLight.shadow.camera.bottom = -165;
+    sunLight.shadow.camera.near = 0.5;
+    sunLight.shadow.camera.far = 420;
+    sunLight.shadow.bias = -0.00018;
+    sunLight.shadow.normalBias = 0.035;
     scene.add(sunLight);
 
-    const fillLight = new THREE.DirectionalLight(0xcce5ff, 0.65);
+    const fillLight = new THREE.DirectionalLight(0xc9e8ff, 0.9);
     fillLight.position.set(-80, 55, -75);
     scene.add(fillLight);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.28));
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -273,10 +280,8 @@ export function useCondominiumTour() {
       keyboardDirections.clear();
       keyboardVerticalDirections.clear();
       keyboardRunning = false;
-      touchDirections.backward = false;
-      touchDirections.forward = false;
-      touchDirections.left = false;
-      touchDirections.right = false;
+      touchForwardAmount = 0;
+      touchRightAmount = 0;
       touchVerticalDirections.down = false;
       touchVerticalDirections.up = false;
     };
@@ -440,6 +445,14 @@ export function useCondominiumTour() {
           requestPointerLock();
         }
       },
+      setMobileMovement: (right, forward) => {
+        touchRightAmount = THREE.MathUtils.clamp(right, -1, 1);
+        touchForwardAmount = THREE.MathUtils.clamp(forward, -1, 1);
+
+        if (Math.abs(right) > 0.02 || Math.abs(forward) > 0.02) {
+          cancelNavigation();
+        }
+      },
       setMode: (nextMode) => {
         const changed = modeRef.current !== nextMode;
         applyMode(nextMode, changed);
@@ -457,12 +470,6 @@ export function useCondominiumTour() {
         if (active && metrics) {
           cancelNavigation();
           updateWalkHeight(direction, 0.45);
-        }
-      },
-      setWalkDirection: (direction, active) => {
-        touchDirections[direction] = active;
-        if (active) {
-          cancelNavigation();
         }
       },
     };
@@ -502,6 +509,13 @@ export function useCondominiumTour() {
         event.preventDefault();
         keyboardVerticalDirections.add("up");
         cancelNavigation();
+      } else if (
+        event.code === "ShiftLeft" ||
+        event.code === "ShiftRight"
+      ) {
+        event.preventDefault();
+        keyboardVerticalDirections.add("down");
+        cancelNavigation();
       } else if (direction) {
         event.preventDefault();
         keyboardDirections.add(direction);
@@ -519,6 +533,11 @@ export function useCondominiumTour() {
         keyboardRunning = false;
       } else if (event.code === "Space") {
         keyboardVerticalDirections.delete("up");
+      } else if (
+        event.code === "ShiftLeft" ||
+        event.code === "ShiftRight"
+      ) {
+        keyboardVerticalDirections.delete("down");
       } else if (direction) {
         keyboardDirections.delete(direction);
       }
@@ -620,7 +639,11 @@ export function useCondominiumTour() {
       false,
     );
 
+    const ktx2Loader = new KTX2Loader()
+      .setTranscoderPath("/basis/")
+      .detectSupport(renderer);
     const loader = new GLTFLoader();
+    loader.setKTX2Loader(ktx2Loader);
     loader.setMeshoptDecoder(MeshoptDecoder);
     loader.load(
       MODEL_URL,
@@ -671,33 +694,23 @@ export function useCondominiumTour() {
             return;
           }
 
-          object.castShadow = false;
-          object.receiveShadow = false;
-
-          if (gateMeshNames.has(object.name)) {
-            const darkenGateMaterial = (material: THREE.Material) => {
-              const gateMaterial = material.clone();
-
-              if (gateMaterial instanceof THREE.MeshStandardMaterial) {
-                gateMaterial.color.set(0x293138);
-                gateMaterial.metalness = 0.68;
-                gateMaterial.roughness = 0.38;
-                gateMaterial.envMapIntensity = 0.75;
-              }
-
-              return gateMaterial;
-            };
-
-            object.material = Array.isArray(object.material)
-              ? object.material.map(darkenGateMaterial)
-              : darkenGateMaterial(object.material);
-          }
+          object.castShadow = !mobileDevice;
+          object.receiveShadow = true;
 
           const materials = Array.isArray(object.material)
             ? object.material
             : [object.material];
 
           materials.forEach((material) => {
+            if (material instanceof THREE.MeshStandardMaterial) {
+              material.envMapIntensity = 0.72;
+              material.roughness = THREE.MathUtils.clamp(
+                material.roughness * 0.9,
+                0.28,
+                1,
+              );
+            }
+
             Object.values(material).forEach((value) => {
               if (value instanceof THREE.Texture) {
                 value.anisotropy = Math.min(
@@ -724,6 +737,7 @@ export function useCondominiumTour() {
           ),
         };
         scene.add(modelRoot);
+        renderer.shadowMap.needsUpdate = !mobileDevice;
 
         applyMode(modeRef.current, true);
         setLoadProgress(100);
@@ -759,7 +773,7 @@ export function useCondominiumTour() {
     const up = new THREE.Vector3(0, 1, 0);
 
     const isMoving = (direction: WalkDirection) =>
-      keyboardDirections.has(direction) || touchDirections[direction];
+      keyboardDirections.has(direction);
     const isMovingVertically = (direction: VerticalDirection) =>
       keyboardVerticalDirections.has(direction) ||
       touchVerticalDirections[direction];
@@ -811,16 +825,28 @@ export function useCondominiumTour() {
               routeDirection,
               Math.min(
                 distance,
-                WALK_SPEED_METERS_PER_SECOND * 2.5 * delta,
+                BASE_WALK_SPEED_METERS_PER_SECOND *
+                  AUTOMATIC_ROUTE_SPEED_MULTIPLIER *
+                  delta,
               ),
             );
             setWalkRotationToward(target);
           }
         } else {
-          const forwardAmount =
-            Number(isMoving("forward")) - Number(isMoving("backward"));
-          const rightAmount =
-            Number(isMoving("right")) - Number(isMoving("left"));
+          const forwardAmount = THREE.MathUtils.clamp(
+            Number(isMoving("forward")) -
+              Number(isMoving("backward")) +
+              touchForwardAmount,
+            -1,
+            1,
+          );
+          const rightAmount = THREE.MathUtils.clamp(
+            Number(isMoving("right")) -
+              Number(isMoving("left")) +
+              touchRightAmount,
+            -1,
+            1,
+          );
           const verticalAmount =
             Number(isMovingVertically("up")) -
             Number(isMovingVertically("down"));
@@ -835,13 +861,18 @@ export function useCondominiumTour() {
             movement
               .copy(forward)
               .multiplyScalar(forwardAmount)
-              .addScaledVector(right, rightAmount)
-              .normalize();
+              .addScaledVector(right, rightAmount);
+
+            if (movement.lengthSq() > 1) {
+              movement.normalize();
+            }
 
             camera.position.addScaledVector(
               movement,
-              WALK_SPEED_METERS_PER_SECOND *
-                (runEnabled || keyboardRunning ? 2 : 1) *
+              BASE_WALK_SPEED_METERS_PER_SECOND *
+                (runEnabled || keyboardRunning
+                  ? RUN_SPEED_MULTIPLIER
+                  : WALK_SPEED_MULTIPLIER) *
                 delta,
             );
           }
@@ -920,6 +951,7 @@ export function useCondominiumTour() {
       }
 
       controls.dispose();
+      ktx2Loader.dispose();
       environmentTexture.dispose();
 
       if (modelRoot) {
@@ -969,11 +1001,8 @@ export function useCondominiumTour() {
     engineRef.current?.setVerticalDirection(direction, active);
   };
 
-  const updateWalkDirection = (
-    direction: WalkDirection,
-    active: boolean,
-  ) => {
-    engineRef.current?.setWalkDirection(direction, active);
+  const updateMobileMovement = (right: number, forward: number) => {
+    engineRef.current?.setMobileMovement(right, forward);
   };
 
   return {
@@ -986,11 +1015,10 @@ export function useCondominiumTour() {
     mode,
     mountRef,
     navigateTo,
-    quality,
     resetView,
     selectMode,
     toggleRunning,
+    updateMobileMovement,
     updateVerticalDirection,
-    updateWalkDirection,
   };
 }

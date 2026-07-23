@@ -7,6 +7,7 @@ const cspDirectives = [
   "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com",
   "font-src 'self' data: https://fonts.gstatic.com",
   "connect-src 'self' blob: https://*.supabase.co wss://*.supabase.co",
+  "worker-src 'self' blob:",
   "frame-src 'self' https://www.youtube.com https://player.vimeo.com https://my.matterport.com https://www.google.com",
   "media-src 'self' https:",
   "object-src 'none'",

@@ -40,6 +40,7 @@ type EntranceGuidePanelProps = {
     id: TourDestination["id"];
     label: string;
   } | null;
+  initiallyOpen?: boolean;
   isPointerLocked: boolean;
   onNavigate: (destination: TourDestination) => void;
   onResumeWalk: () => void;
@@ -146,11 +147,12 @@ function ApartmentCard({
 
 export function EntranceGuidePanel({
   activeRoute,
+  initiallyOpen = true,
   isPointerLocked,
   onNavigate,
   onResumeWalk,
 }: EntranceGuidePanelProps) {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(initiallyOpen);
   const [panelView, setPanelView] = useState<PanelView>("menu");
   const [rating, setRating] = useState(0);
   const [reviewApartment, setReviewApartment] = useState("");
@@ -223,6 +225,7 @@ export function EntranceGuidePanel({
     return (
       <button
         className="pointer-events-auto absolute left-3 top-[4.75rem] z-20 flex min-h-12 max-w-[calc(100vw-1.5rem)] items-center gap-2 rounded-md border border-cyan-300/35 bg-slate-950/92 px-4 text-left text-xs font-black text-white shadow-xl transition hover:border-cyan-200 sm:top-[5.75rem]"
+        onContextMenu={(event) => event.preventDefault()}
         onClick={() => setIsOpen(true)}
         type="button"
       >
@@ -233,7 +236,10 @@ export function EntranceGuidePanel({
   }
 
   return (
-    <aside className="pointer-events-auto absolute inset-x-3 bottom-[4.9rem] z-20 flex max-h-[58dvh] flex-col overflow-hidden rounded-md border border-cyan-300/35 bg-slate-950/94 text-white shadow-2xl backdrop-blur-md sm:inset-x-auto sm:bottom-auto sm:left-4 sm:top-[5.75rem] sm:max-h-[calc(100dvh-7rem)] sm:w-[370px]">
+    <aside
+      className="pointer-events-auto absolute inset-x-3 bottom-[4.9rem] z-20 flex max-h-[58dvh] flex-col overflow-hidden rounded-md border border-cyan-300/35 bg-slate-950/94 text-white shadow-2xl backdrop-blur-md sm:inset-x-auto sm:bottom-auto sm:left-4 sm:top-[5.75rem] sm:max-h-[calc(100dvh-7rem)] sm:w-[370px]"
+      onContextMenu={(event) => event.preventDefault()}
+    >
       <header className="flex shrink-0 items-start justify-between gap-3 border-b border-white/10 px-4 py-3.5">
         <div className="min-w-0">
           <p className="text-[10px] font-black uppercase tracking-[0.14em] text-cyan-300">

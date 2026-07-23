@@ -18,6 +18,7 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "output/**",
+    "public/basis/**",
     ".playwright-cli/**",
     "next-env.d.ts",
   ]),

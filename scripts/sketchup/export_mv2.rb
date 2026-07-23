@@ -141,6 +141,20 @@ module MV2
               camera_lookat: true
             }
           )
+        elsif export_format == "obj"
+          model.export(
+            export_path,
+            {
+              units: "m",
+              triangulated_faces: true,
+              doublesided_faces: false,
+              edges: false,
+              texture_maps: true,
+              swap_yz: true,
+              selectionset_only: false,
+              show_summary: false
+            }
+          )
         else
           model.export(export_path)
         end

@@ -4,27 +4,22 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import {
   ArrowLeft,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ChevronUp,
-  FastForward,
   Footprints,
   Maximize2,
   Minimize2,
-  MoveDown,
-  MoveUp,
   Orbit,
+  Play,
   RotateCcw,
+  RotateCw,
   TriangleAlert,
 } from "lucide-react";
 
 import { EntranceGuidePanel } from "@/components/tour/EntranceGuidePanel";
+import { MobileTourControls } from "@/components/tour/MobileTourControls";
 import type {
   TourDestination,
   TourMode,
   VerticalDirection,
-  WalkDirection,
 } from "@/components/tour/tour-types";
 
 type TourOverlayProps = {
@@ -35,22 +30,26 @@ type TourOverlayProps = {
   error: string | null;
   isFullscreen: boolean;
   isLoaded: boolean;
+  isMobile: boolean;
+  isMobileTourStarted: boolean;
   isPointerLocked: boolean;
+  isPortrait: boolean;
   isRunning: boolean;
   loadProgress: number;
   mode: TourMode;
   onModeChange: (mode: TourMode) => void;
+  onMobileMovementChange: (
+    right: number,
+    forward: number,
+  ) => void;
   onNavigate: (destination: TourDestination) => void;
   onReset: () => void;
   onRetry: () => void;
   onRunToggle: () => void;
+  onStartMobileTour: () => void;
   onToggleFullscreen: () => void;
   onVerticalDirectionChange: (
     direction: VerticalDirection,
-    active: boolean,
-  ) => void;
-  onWalkDirectionChange: (
-    direction: WalkDirection,
     active: boolean,
   ) => void;
 };
@@ -120,64 +119,6 @@ function IconButton({
   );
 }
 
-function HoldButton({
-  active,
-  children,
-  label,
-  onActiveChange,
-}: {
-  active?: boolean;
-  children: ReactNode;
-  label: string;
-  onActiveChange: (active: boolean) => void;
-}) {
-  const release = () => onActiveChange(false);
-
-  return (
-    <button
-      aria-label={label}
-      className={`grid min-h-12 touch-none place-items-center rounded-md px-3 text-white shadow-md ring-1 ring-white/20 transition ${
-        active ? "bg-sky-600" : "bg-slate-950/88 active:bg-sky-700"
-      }`}
-      onContextMenu={(event) => event.preventDefault()}
-      onPointerCancel={release}
-      onPointerDown={(event) => {
-        event.currentTarget.setPointerCapture(event.pointerId);
-        onActiveChange(true);
-      }}
-      onPointerUp={release}
-      title={label}
-      type="button"
-    >
-      {children}
-    </button>
-  );
-}
-
-function WalkButton({
-  children,
-  direction,
-  label,
-  onDirectionChange,
-}: {
-  children: ReactNode;
-  direction: WalkDirection;
-  label: string;
-  onDirectionChange: (
-    direction: WalkDirection,
-    active: boolean,
-  ) => void;
-}) {
-  return (
-    <HoldButton
-      label={label}
-      onActiveChange={(active) => onDirectionChange(direction, active)}
-    >
-      {children}
-    </HoldButton>
-  );
-}
-
 function ModeSwitcher({
   className,
   isLoaded,
@@ -219,18 +160,22 @@ export function TourOverlay({
   error,
   isFullscreen,
   isLoaded,
+  isMobile,
+  isMobileTourStarted,
   isPointerLocked,
+  isPortrait,
   isRunning,
   loadProgress,
   mode,
   onModeChange,
+  onMobileMovementChange,
   onNavigate,
   onReset,
   onRetry,
   onRunToggle,
+  onStartMobileTour,
   onToggleFullscreen,
   onVerticalDirectionChange,
-  onWalkDirectionChange,
 }: TourOverlayProps) {
   return (
     <>
@@ -263,12 +208,14 @@ export function TourOverlay({
           </div>
 
           <div className="pointer-events-auto flex shrink-0 gap-2">
-            <ModeSwitcher
-              className="hidden sm:flex"
-              isLoaded={isLoaded}
-              mode={mode}
-              onModeChange={onModeChange}
-            />
+            {!isMobile ? (
+              <ModeSwitcher
+                className="flex"
+                isLoaded={isLoaded}
+                mode={mode}
+                onModeChange={onModeChange}
+              />
+            ) : null}
             <IconButton
               disabled={!isLoaded}
               label="Reiniciar vista"
@@ -333,108 +280,88 @@ export function TourOverlay({
           </div>
         ) : null}
 
-        {isLoaded && mode === "walk" && isPointerLocked ? (
+        {isLoaded &&
+        isMobile &&
+        (!isMobileTourStarted || isPortrait) &&
+        !error ? (
+          <div
+            className="pointer-events-auto absolute left-1/2 top-1/2 w-[min(84vw,340px)] -translate-x-1/2 -translate-y-1/2 rounded-lg bg-slate-950/94 p-5 text-center text-white shadow-2xl ring-1 ring-white/20"
+            onContextMenu={(event) => event.preventDefault()}
+          >
+            <RotateCw className="mx-auto text-cyan-300" size={30} />
+            <p className="mt-3 text-base font-black">
+              {isMobileTourStarted
+                ? "Gire o celular para continuar"
+                : "Iniciar tour em tela horizontal"}
+            </p>
+            <p className="mt-1.5 text-xs font-semibold leading-5 text-white/65">
+              A navegacao foi preparada para o telefone deitado.
+            </p>
+            {!isMobileTourStarted ? (
+              <button
+                className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-cyan-400 px-4 text-sm font-black text-slate-950"
+                onClick={onStartMobileTour}
+                type="button"
+              >
+                <Play size={18} />
+                Entrar no passeio
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
+        {isLoaded &&
+        mode === "walk" &&
+        isPointerLocked &&
+        !isMobile ? (
           <>
             <div
               aria-hidden="true"
-              className="absolute left-1/2 top-1/2 hidden size-5 -translate-x-1/2 -translate-y-1/2 sm:block"
+              className="absolute left-1/2 top-1/2 size-5 -translate-x-1/2 -translate-y-1/2"
             >
               <span className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-white/75 shadow" />
               <span className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-white/75 shadow" />
             </div>
-            <p className="absolute bottom-4 left-1/2 hidden -translate-x-1/2 rounded-md bg-slate-950/78 px-4 py-2 text-center text-xs font-bold text-white shadow-lg sm:block">
-              WASD mover | CTRL correr | ESPACO subir | ESC liberar cursor
+            <p className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-md bg-slate-950/78 px-4 py-2 text-center text-xs font-bold text-white shadow-lg">
+              WASD mover | CTRL correr | ESPACO subir | SHIFT descer |
+              ESC liberar cursor
             </p>
           </>
         ) : null}
 
-        {isLoaded && mode === "walk" ? (
-          <div
-            aria-label="Controles de caminhada"
-            className="pointer-events-auto mt-auto flex items-end justify-between gap-2 sm:hidden"
-          >
-            <div className="grid w-[148px] grid-cols-3 gap-1">
-              <span />
-              <WalkButton
-                direction="forward"
-                label="Caminhar para frente"
-                onDirectionChange={onWalkDirectionChange}
-              >
-                <ChevronUp size={24} />
-              </WalkButton>
-              <span />
-              <WalkButton
-                direction="left"
-                label="Caminhar para a esquerda"
-                onDirectionChange={onWalkDirectionChange}
-              >
-                <ChevronLeft size={24} />
-              </WalkButton>
-              <WalkButton
-                direction="backward"
-                label="Caminhar para tras"
-                onDirectionChange={onWalkDirectionChange}
-              >
-                <ChevronDown size={24} />
-              </WalkButton>
-              <WalkButton
-                direction="right"
-                label="Caminhar para a direita"
-                onDirectionChange={onWalkDirectionChange}
-              >
-                <ChevronRight size={24} />
-              </WalkButton>
-            </div>
-
-            <div className="grid w-[82px] gap-1">
-              <button
-                aria-pressed={isRunning}
-                className={`flex min-h-12 items-center justify-center gap-1 rounded-md px-2 text-[11px] font-black text-white shadow-md ring-1 ring-white/20 transition ${
-                  isRunning ? "bg-sky-600" : "bg-slate-950/88"
-                }`}
-                onClick={onRunToggle}
-                title="Correr em velocidade 2x"
-                type="button"
-              >
-                <FastForward size={17} />
-                Correr
-              </button>
-              <HoldButton
-                label="Subir enquanto estiver pressionado"
-                onActiveChange={(active) =>
-                  onVerticalDirectionChange("up", active)
-                }
-              >
-                <span className="flex items-center gap-1 text-[11px] font-black">
-                  <MoveUp size={17} />
-                  Subir
-                </span>
-              </HoldButton>
-              <HoldButton
-                label="Descer enquanto estiver pressionado"
-                onActiveChange={(active) =>
-                  onVerticalDirectionChange("down", active)
-                }
-              >
-                <MoveDown size={19} />
-              </HoldButton>
-            </div>
+        {isLoaded &&
+        isMobile &&
+        isMobileTourStarted &&
+        !isPortrait &&
+        mode === "walk" ? (
+          <div className="mt-auto">
+            <MobileTourControls
+              isRunning={isRunning}
+              onMovementChange={onMobileMovementChange}
+              onRunToggle={onRunToggle}
+              onVerticalDirectionChange={onVerticalDirectionChange}
+            />
           </div>
         ) : (
           <div className="mt-auto" />
         )}
 
-        <ModeSwitcher
-          className="flex w-full sm:hidden"
-          isLoaded={isLoaded}
-          mode={mode}
-          onModeChange={onModeChange}
-        />
+        {isMobile && isMobileTourStarted && !isPortrait ? (
+          <ModeSwitcher
+            className="mx-auto flex w-[min(48vw,240px)]"
+            isLoaded={isLoaded}
+            mode={mode}
+            onModeChange={onModeChange}
+          />
+        ) : null}
       </div>
 
-      {isLoaded && !error ? (
+      {isLoaded &&
+      !error &&
+      (!isMobile || (isMobileTourStarted && !isPortrait)) ? (
         <EntranceGuidePanel
           activeRoute={activeRoute}
+          initiallyOpen={!isMobile}
           isPointerLocked={isPointerLocked}
           onNavigate={onNavigate}
           onResumeWalk={() => onModeChange("walk")}

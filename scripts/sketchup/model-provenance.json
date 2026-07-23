@@ -1,0 +1,24 @@
+{
+  "source": {
+    "file": "Condomínio MV2.skp",
+    "bytes": 147457745,
+    "sha256": "C866BF2BCBEFC9210C311D44BF0C1CCF7C14C28EFB439FDCB799546ECC2BA2B8",
+    "sketchupVersion": "25.0.571",
+    "faces": 2802928,
+    "materials": 263,
+    "texturedMaterials": 32
+  },
+  "webAsset": {
+    "file": "condominio-mv2-completo-c866bf2b.glb",
+    "bytes": 55261960,
+    "sha256": "C2ACDD1DB03B100E0B86FFA084CE1CBDB1079E0DBA2134A0805508328B123994",
+    "triangles": 7526946,
+    "materials": 248,
+    "textures": 27,
+    "drawCalls": 248,
+    "geometrySimplification": false,
+    "positionQuantizationBits": 16,
+    "textureCoordinateQuantizationBits": 16,
+    "textureFormat": "KTX2"
+  }
+}
