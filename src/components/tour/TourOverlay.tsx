@@ -155,6 +155,7 @@ export function TourOverlay({
             aria-label="Voltar para a pagina inicial"
             className="grid size-10 shrink-0 place-items-center rounded-md bg-white/95 text-slate-900 shadow-md ring-1 ring-slate-900/10 transition hover:bg-white"
             href="/"
+            prefetch={false}
             title="Voltar"
           >
             <ArrowLeft size={20} />

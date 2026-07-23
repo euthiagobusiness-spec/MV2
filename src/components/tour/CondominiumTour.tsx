@@ -63,7 +63,6 @@ export function CondominiumTour() {
         aria-hidden="true"
         className="absolute inset-0 h-full w-full object-cover"
         fill
-        priority
         sizes="100vw"
         src="/uploads/condominium/084657bf-ecb2-4fd3-971b-4e7ff02a14fe.jpg"
       />
