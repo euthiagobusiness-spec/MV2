@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 import { QRCodeDownloadCard } from "@/components/guest/QRCodeDownloadCard";
@@ -40,11 +41,15 @@ export default async function GuestExperienceAdminPage() {
           {properties.map((property) => (
             <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm" key={property.id}>
               {property.cover_image_url ? (
-                <img
-                  alt={property.name}
-                  className="aspect-[4/3] w-full rounded-lg object-cover"
-                  src={property.cover_image_url}
-                />
+                <div className="relative aspect-[4/3] overflow-hidden rounded-lg bg-slate-100">
+                  <Image
+                    alt={property.name}
+                    className="object-cover"
+                    fill
+                    sizes="(max-width: 767px) 100vw, (max-width: 1279px) 50vw, 25vw"
+                    src={property.cover_image_url}
+                  />
+                </div>
               ) : null}
               <QRCodeDownloadCard
                 title={property.name}

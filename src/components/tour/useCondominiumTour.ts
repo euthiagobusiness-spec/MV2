@@ -6,7 +6,12 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 
-import type { TourMode, WalkDirection } from "@/components/tour/tour-types";
+import type {
+  TourMode,
+  TourQuality,
+  VerticalDirection,
+  WalkDirection,
+} from "@/components/tour/tour-types";
 
 type ModelMetrics = {
   bounds: THREE.Box3;
@@ -18,12 +23,19 @@ type ModelMetrics = {
 
 type TourEngine = {
   reset: (mode: TourMode) => void;
+  setRunEnabled: (enabled: boolean) => void;
   setMode: (mode: TourMode) => void;
+  setVerticalDirection: (
+    direction: VerticalDirection,
+    active: boolean,
+  ) => void;
   setWalkDirection: (direction: WalkDirection, active: boolean) => void;
 };
 
-const MODEL_URL =
+const DESKTOP_MODEL_URL =
   "/models/condominio-mv2/condominio-mv2-7c5adb14.glb";
+const MOBILE_MODEL_URL =
+  "/models/condominio-mv2/condominio-mv2-mobile.glb";
 
 const keyDirections: Partial<Record<string, WalkDirection>> = {
   ArrowDown: "backward",
@@ -35,6 +47,27 @@ const keyDirections: Partial<Record<string, WalkDirection>> = {
   KeyS: "backward",
   KeyW: "forward",
 };
+
+const keyVerticalDirections: Partial<
+  Record<string, VerticalDirection>
+> = {
+  KeyE: "up",
+  KeyQ: "down",
+  PageDown: "down",
+  PageUp: "up",
+};
+
+function shouldUseMobileModel() {
+  const deviceMemory = (
+    navigator as Navigator & { deviceMemory?: number }
+  ).deviceMemory;
+
+  return (
+    window.matchMedia("(max-width: 767px), (pointer: coarse)").matches ||
+    (deviceMemory !== undefined && deviceMemory <= 4) ||
+    (navigator.hardwareConcurrency ?? 8) <= 4
+  );
+}
 
 function disposeModel(root: THREE.Object3D) {
   const geometries = new Set<THREE.BufferGeometry>();
@@ -81,8 +114,10 @@ export function useCondominiumTour() {
   const modeRef = useRef<TourMode>("overview");
   const [error, setError] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
   const [loadProgress, setLoadProgress] = useState(0);
   const [mode, setMode] = useState<TourMode>("overview");
+  const [quality, setQuality] = useState<TourQuality>("mobile");
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -90,6 +125,12 @@ export function useCondominiumTour() {
     if (!mount) {
       return;
     }
+
+    const mobileDevice = shouldUseMobileModel();
+    const modelUrl = mobileDevice
+      ? MOBILE_MODEL_URL
+      : DESKTOP_MODEL_URL;
+    setQuality(mobileDevice ? "mobile" : "full");
 
     let renderer: THREE.WebGLRenderer;
 
@@ -115,15 +156,23 @@ export function useCondominiumTour() {
     let lastPointerY = 0;
     let metrics: ModelMetrics | null = null;
     let modelRoot: THREE.Object3D | null = null;
+    let keyboardRunning = false;
+    let runEnabled = false;
+    let walkHeightOffset = 0;
     let walkPitch = 0;
     let walkYaw = 0;
 
     const keyboardDirections = new Set<WalkDirection>();
+    const keyboardVerticalDirections = new Set<VerticalDirection>();
     const touchDirections: Record<WalkDirection, boolean> = {
       backward: false,
       forward: false,
       left: false,
       right: false,
+    };
+    const touchVerticalDirections: Record<VerticalDirection, boolean> = {
+      down: false,
+      up: false,
     };
 
     const scene = new THREE.Scene();
@@ -206,6 +255,7 @@ export function useCondominiumTour() {
 
       const lookTarget = new THREE.Vector3(0, metrics.walkHeight, 0);
 
+      walkHeightOffset = 0;
       camera.position.copy(metrics.walkStart);
       if (camera.position.distanceToSquared(lookTarget) < 25) {
         lookTarget.z -= Math.max(10, metrics.size.z * 0.15);
@@ -224,10 +274,35 @@ export function useCondominiumTour() {
 
     const clearMovement = () => {
       keyboardDirections.clear();
+      keyboardVerticalDirections.clear();
+      keyboardRunning = false;
       touchDirections.backward = false;
       touchDirections.forward = false;
       touchDirections.left = false;
       touchDirections.right = false;
+      touchVerticalDirections.down = false;
+      touchVerticalDirections.up = false;
+    };
+
+    const updateWalkHeight = (
+      direction: VerticalDirection,
+      amount: number,
+    ) => {
+      if (!metrics || modeRef.current !== "walk") {
+        return;
+      }
+
+      const directionSign = direction === "up" ? 1 : -1;
+      const maximumOffset = Math.max(
+        4,
+        Math.min(metrics.maxDimension * 0.32, 30),
+      );
+      walkHeightOffset = THREE.MathUtils.clamp(
+        walkHeightOffset + directionSign * amount,
+        0,
+        maximumOffset,
+      );
+      camera.position.y = metrics.walkHeight + walkHeightOffset;
     };
 
     const applyMode = (nextMode: TourMode) => {
@@ -249,7 +324,20 @@ export function useCondominiumTour() {
 
     engineRef.current = {
       reset: applyMode,
+      setRunEnabled: (enabled) => {
+        runEnabled = enabled;
+      },
       setMode: applyMode,
+      setVerticalDirection: (direction, active) => {
+        touchVerticalDirections[direction] = active;
+
+        if (active && metrics) {
+          updateWalkHeight(
+            direction,
+            Math.max(0.45, metrics.maxDimension * 0.003),
+          );
+        }
+      },
       setWalkDirection: (direction, active) => {
         touchDirections[direction] = active;
       },
@@ -258,11 +346,9 @@ export function useCondominiumTour() {
     const resizeRenderer = () => {
       const width = Math.max(1, mount.clientWidth);
       const height = Math.max(1, mount.clientHeight);
-      const lowPowerDevice =
-        window.innerWidth < 768 || (navigator.hardwareConcurrency ?? 8) <= 4;
-      const pixelRatio = lowPowerDevice
-        ? Math.min(window.devicePixelRatio, 1)
-        : Math.min(window.devicePixelRatio, 1.4);
+      const pixelRatio = mobileDevice
+        ? Math.min(window.devicePixelRatio, 0.9)
+        : Math.min(window.devicePixelRatio, 1.35);
 
       renderer.setPixelRatio(pixelRatio);
       renderer.setSize(width, height, false);
@@ -276,23 +362,35 @@ export function useCondominiumTour() {
 
     const onKeyDown = (event: KeyboardEvent) => {
       const direction = keyDirections[event.code];
+      const verticalDirection = keyVerticalDirections[event.code];
 
-      if (!direction || modeRef.current !== "walk") {
+      if (modeRef.current !== "walk") {
         return;
       }
 
-      event.preventDefault();
-      keyboardDirections.add(direction);
+      if (event.code === "ShiftLeft" || event.code === "ShiftRight") {
+        event.preventDefault();
+        keyboardRunning = true;
+      } else if (direction) {
+        event.preventDefault();
+        keyboardDirections.add(direction);
+      } else if (verticalDirection) {
+        event.preventDefault();
+        keyboardVerticalDirections.add(verticalDirection);
+      }
     };
 
     const onKeyUp = (event: KeyboardEvent) => {
       const direction = keyDirections[event.code];
+      const verticalDirection = keyVerticalDirections[event.code];
 
-      if (!direction) {
-        return;
+      if (event.code === "ShiftLeft" || event.code === "ShiftRight") {
+        keyboardRunning = false;
+      } else if (direction) {
+        keyboardDirections.delete(direction);
+      } else if (verticalDirection) {
+        keyboardVerticalDirections.delete(verticalDirection);
       }
-
-      keyboardDirections.delete(direction);
     };
 
     const onPointerDown = (event: PointerEvent) => {
@@ -366,7 +464,7 @@ export function useCondominiumTour() {
     const loader = new GLTFLoader();
     loader.setMeshoptDecoder(MeshoptDecoder);
     loader.load(
-      MODEL_URL,
+      modelUrl,
       (gltf) => {
         if (cancelled) {
           disposeModel(gltf.scene);
@@ -445,9 +543,24 @@ export function useCondominiumTour() {
 
     const isMoving = (direction: WalkDirection) =>
       keyboardDirections.has(direction) || touchDirections[direction];
+    const isMovingVertically = (direction: VerticalDirection) =>
+      keyboardVerticalDirections.has(direction) ||
+      touchVerticalDirections[direction];
+    const minimumFrameInterval = mobileDevice ? 1000 / 30 : 0;
+    let lastFrameTime = 0;
 
     const render = (timestamp: number) => {
       animationFrame = window.requestAnimationFrame(render);
+
+      if (
+        document.hidden ||
+        (minimumFrameInterval > 0 &&
+          timestamp - lastFrameTime < minimumFrameInterval)
+      ) {
+        return;
+      }
+
+      lastFrameTime = timestamp;
       timer.update(timestamp);
       const delta = Math.min(timer.getDelta(), 0.05);
 
@@ -456,6 +569,9 @@ export function useCondominiumTour() {
           Number(isMoving("forward")) - Number(isMoving("backward"));
         const rightAmount =
           Number(isMoving("right")) - Number(isMoving("left"));
+        const verticalAmount =
+          Number(isMovingVertically("up")) -
+          Number(isMovingVertically("down"));
 
         if (forwardAmount !== 0 || rightAmount !== 0) {
           forward
@@ -472,7 +588,10 @@ export function useCondominiumTour() {
 
           camera.position.addScaledVector(
             movement,
-            metrics.maxDimension * 0.035 * delta,
+            metrics.maxDimension *
+              0.035 *
+              (runEnabled || keyboardRunning ? 2 : 1) *
+              delta,
           );
           camera.position.x = THREE.MathUtils.clamp(
             camera.position.x,
@@ -484,8 +603,16 @@ export function useCondominiumTour() {
             metrics.bounds.min.z + 1,
             metrics.bounds.max.z - 1,
           );
-          camera.position.y = metrics.walkHeight;
         }
+
+        if (verticalAmount !== 0) {
+          updateWalkHeight(
+            verticalAmount > 0 ? "up" : "down",
+            metrics.maxDimension * 0.028 * delta,
+          );
+        }
+
+        camera.position.y = metrics.walkHeight + walkHeightOffset;
       }
 
       if (controls.enabled) {
@@ -537,7 +664,24 @@ export function useCondominiumTour() {
   };
 
   const resetView = () => {
+    setIsRunning(false);
+    engineRef.current?.setRunEnabled(false);
     engineRef.current?.reset(modeRef.current);
+  };
+
+  const toggleRunning = () => {
+    setIsRunning((current) => {
+      const next = !current;
+      engineRef.current?.setRunEnabled(next);
+      return next;
+    });
+  };
+
+  const updateVerticalDirection = (
+    direction: VerticalDirection,
+    active: boolean,
+  ) => {
+    engineRef.current?.setVerticalDirection(direction, active);
   };
 
   const updateWalkDirection = (
@@ -550,11 +694,15 @@ export function useCondominiumTour() {
   return {
     error,
     isLoaded,
+    isRunning,
     loadProgress,
     mode,
     mountRef,
+    quality,
     resetView,
     selectMode,
+    toggleRunning,
+    updateVerticalDirection,
     updateWalkDirection,
   };
 }

@@ -12,11 +12,15 @@ export function CondominiumTour() {
   const {
     error,
     isLoaded,
+    isRunning,
     loadProgress,
     mode,
     mountRef,
+    quality,
     resetView,
     selectMode,
+    toggleRunning,
+    updateVerticalDirection,
     updateWalkDirection,
   } = useCondominiumTour();
 
@@ -53,9 +57,10 @@ export function CondominiumTour() {
 
   return (
     <section
-      className="relative h-svh min-h-[480px] w-full overflow-hidden bg-sky-100"
+      className="relative h-dvh min-h-[480px] w-full touch-none overflow-hidden overscroll-none bg-sky-100"
       data-loaded={isLoaded}
       data-mode={mode}
+      data-quality={quality}
       ref={sectionRef}
     >
       <Image
@@ -72,12 +77,16 @@ export function CondominiumTour() {
         error={error}
         isFullscreen={isFullscreen}
         isLoaded={isLoaded}
+        isRunning={isRunning}
         loadProgress={loadProgress}
         mode={mode}
+        quality={quality}
         onModeChange={selectMode}
         onReset={resetView}
         onRetry={() => window.location.reload()}
+        onRunToggle={toggleRunning}
         onToggleFullscreen={toggleFullscreen}
+        onVerticalDirectionChange={updateVerticalDirection}
         onWalkDirectionChange={updateWalkDirection}
       />
     </section>

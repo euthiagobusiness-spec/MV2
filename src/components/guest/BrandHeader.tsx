@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 import { mv2Logo } from "@/lib/property-catalog";
@@ -6,10 +7,12 @@ export function BrandHeader() {
   return (
     <header className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-5 lg:px-8">
       <Link className="flex items-center gap-3" href="/guest-access">
-        <img
+        <Image
           alt="MV2 Temporada"
           className="h-12 w-12 rounded-xl object-cover"
+          height={48}
           src={mv2Logo}
+          width={48}
         />
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-700">

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { MapPin, MessageCircle, Users } from "lucide-react";
 import type { ComponentType } from "react";
 
@@ -15,9 +16,11 @@ export function PropertyPreviewHero({ property }: { property: Property }) {
       <div className="grid min-w-0 overflow-hidden rounded-2xl bg-white shadow-lg lg:grid-cols-[1.05fr_0.95fr]">
         <div className="relative min-h-[380px] min-w-0 bg-slate-100">
           {property.cover_image_url ? (
-            <img
+            <Image
               alt={property.name}
-              className="absolute inset-0 h-full w-full object-cover"
+              className="object-cover"
+              fill
+              sizes="(min-width: 1024px) 53vw, 100vw"
               src={property.cover_image_url}
             />
           ) : null}

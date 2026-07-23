@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { CalendarDays, Users } from "lucide-react";
 
@@ -8,11 +9,13 @@ import { formatDate } from "@/lib/utils";
 export function ReservationMatchCard({ match }: { match: ReservationMatch }) {
   return (
     <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:grid-cols-[160px_1fr]">
-      <div className="overflow-hidden rounded-lg bg-slate-100">
+      <div className="relative min-h-[150px] overflow-hidden rounded-lg bg-slate-100">
         {match.property.cover_image_url ? (
-          <img
+          <Image
             alt={match.property.name}
-            className="aspect-[4/3] h-full w-full object-cover"
+            className="object-cover"
+            fill
+            sizes="(max-width: 639px) 100vw, 160px"
             src={match.property.cover_image_url}
           />
         ) : null}

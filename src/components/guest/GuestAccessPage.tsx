@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, QrCode, Search, ShieldCheck } from "lucide-react";
 
@@ -51,7 +52,13 @@ export function GuestAccessPage({ properties }: { properties: Property[] }) {
 
         <div className="grid gap-5">
           <div className="relative min-h-[360px] overflow-hidden rounded-2xl bg-slate-200 shadow-lg">
-            <img alt="MV2 Maranduba" className="absolute inset-0 h-full w-full object-cover" src={heroImage} />
+            <Image
+              alt="MV2 Maranduba"
+              className="object-cover"
+              fill
+              sizes="(min-width: 1024px) 45vw, 100vw"
+              src={heroImage}
+            />
             <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/12 to-transparent" />
             <div className="absolute bottom-5 left-5 right-5 text-white">
               <ShieldCheck size={34} />

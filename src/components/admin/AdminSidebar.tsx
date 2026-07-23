@@ -1,26 +1,6 @@
 import Link from "next/link";
-import {
-  Building2,
-  CalendarDays,
-  ClipboardCheck,
-  ConciergeBell,
-  QrCode,
-  LayoutDashboard,
-  Map,
-  Settings,
-} from "lucide-react";
 
-const links = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/properties", label: "Imoveis", icon: Building2 },
-  { href: "/admin/reservations", label: "Reservas", icon: CalendarDays },
-  { href: "/admin/checkins", label: "Check-ins", icon: ClipboardCheck },
-  { href: "/verificacao-operacional", label: "Verificacao diaria", icon: ClipboardCheck },
-  { href: "/admin/local-guide", label: "Guia local", icon: Map },
-  { href: "/admin/extras", label: "Extras", icon: ConciergeBell },
-  { href: "/admin/guest-experience", label: "Experiencia do hospede", icon: QrCode },
-  { href: "/admin/settings", label: "Configuracoes", icon: Settings },
-];
+import { adminLinks } from "@/components/admin/admin-navigation";
 
 export function AdminSidebar() {
   return (
@@ -36,7 +16,7 @@ export function AdminSidebar() {
       </Link>
 
       <nav className="mt-8 grid gap-1">
-        {links.map((link) => (
+        {adminLinks.map((link) => (
           <Link
             className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-bold text-slate-600 hover:bg-teal-50 hover:text-teal-950"
             href={link.href}

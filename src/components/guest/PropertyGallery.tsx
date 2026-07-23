@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 export function PropertyGallery({
   images,
   title,
@@ -22,12 +24,18 @@ export function PropertyGallery({
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {images.map((image, index) => (
-          <img
-            alt={`${title} ${index + 1}`}
-            className="aspect-[4/3] w-full rounded-xl object-cover"
+          <div
+            className="relative aspect-[4/3] overflow-hidden rounded-xl bg-slate-100"
             key={image}
-            src={image}
-          />
+          >
+            <Image
+              alt={`${title} ${index + 1}`}
+              className="object-cover"
+              fill
+              sizes="(max-width: 639px) 100vw, (max-width: 1023px) 50vw, 25vw"
+              src={image}
+            />
+          </div>
         ))}
       </div>
     </section>

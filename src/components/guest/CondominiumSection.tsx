@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { Box, CheckCircle2 } from "lucide-react";
 
@@ -36,12 +37,18 @@ export function CondominiumSection({ property }: { property: Property }) {
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
           {images.slice(0, 6).map((image, index) => (
-            <img
-              alt={`Area externa ${index + 1}`}
-              className="aspect-[4/3] w-full rounded-xl object-cover"
+            <div
+              className="relative aspect-[4/3] overflow-hidden rounded-xl bg-slate-800"
               key={image}
-              src={image}
-            />
+            >
+              <Image
+                alt={`Area externa ${index + 1}`}
+                className="object-cover"
+                fill
+                sizes="(max-width: 639px) 100vw, (max-width: 1023px) 33vw, 24vw"
+                src={image}
+              />
+            </div>
           ))}
         </div>
       </div>

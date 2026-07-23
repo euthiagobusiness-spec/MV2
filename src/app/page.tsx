@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -72,7 +73,14 @@ export default async function Home() {
         </div>
 
         <div className="relative min-h-[520px] overflow-hidden rounded-2xl bg-slate-200 shadow-xl">
-          <img alt="Apartamento MV2" className="absolute inset-0 h-full w-full object-cover" src={hero} />
+          <Image
+            alt="Apartamento MV2"
+            className="object-cover"
+            fill
+            preload
+            sizes="(min-width: 1024px) 48vw, 100vw"
+            src={hero}
+          />
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950/76 via-slate-950/16 to-transparent" />
           <div className="absolute bottom-5 left-5 right-5 text-white">
             <p className="w-fit rounded-full bg-white/90 px-3 py-1 text-sm font-black text-slate-950">
@@ -141,9 +149,11 @@ export default async function Home() {
           >
             {condominiumImages.slice(0, 6).map((image, index) => (
               <div className="relative aspect-[4/3] overflow-hidden" key={image}>
-                <img
+                <Image
                   alt={`Area externa ${index + 1}`}
-                  className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                  className="object-cover transition duration-300 group-hover:scale-105"
+                  fill
+                  sizes="(max-width: 639px) 100vw, 33vw"
                   src={image}
                 />
                 {index === 0 ? (
