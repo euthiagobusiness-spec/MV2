@@ -10,12 +10,15 @@ export function CondominiumTour() {
   const sectionRef = useRef<HTMLElement | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const {
+    activeRoute,
     error,
     isLoaded,
+    isPointerLocked,
     isRunning,
     loadProgress,
     mode,
     mountRef,
+    navigateTo,
     quality,
     resetView,
     selectMode,
@@ -74,14 +77,16 @@ export function CondominiumTour() {
       <div className="absolute inset-0 bg-slate-950/18" />
       <div className="absolute inset-0 z-[1]" ref={mountRef} />
       <TourOverlay
+        activeRoute={activeRoute}
         error={error}
         isFullscreen={isFullscreen}
         isLoaded={isLoaded}
+        isPointerLocked={isPointerLocked}
         isRunning={isRunning}
         loadProgress={loadProgress}
         mode={mode}
-        quality={quality}
         onModeChange={selectMode}
+        onNavigate={navigateTo}
         onReset={resetView}
         onRetry={() => window.location.reload()}
         onRunToggle={toggleRunning}

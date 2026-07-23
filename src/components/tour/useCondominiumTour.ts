@@ -3,10 +3,17 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 
+import {
+  entrancePosition,
+  entranceTarget,
+} from "@/components/tour/tour-locations";
 import type {
+  NormalizedTourPoint,
+  TourDestination,
   TourMode,
   TourQuality,
   VerticalDirection,
@@ -17,14 +24,28 @@ type ModelMetrics = {
   bounds: THREE.Box3;
   maxDimension: number;
   size: THREE.Vector3;
-  walkStart: THREE.Vector3;
   walkHeight: number;
+  walkStart: THREE.Vector3;
+  walkTarget: THREE.Vector3;
+};
+
+type ActiveRoute = {
+  id: TourDestination["id"];
+  label: string;
+};
+
+type NavigationState = {
+  destination: TourDestination;
+  pointIndex: number;
+  points: THREE.Vector3[];
 };
 
 type TourEngine = {
+  cancelNavigation: () => void;
+  navigateTo: (destination: TourDestination) => void;
   reset: (mode: TourMode) => void;
-  setRunEnabled: (enabled: boolean) => void;
   setMode: (mode: TourMode) => void;
+  setRunEnabled: (enabled: boolean) => void;
   setVerticalDirection: (
     direction: VerticalDirection,
     active: boolean,
@@ -32,10 +53,15 @@ type TourEngine = {
   setWalkDirection: (direction: WalkDirection, active: boolean) => void;
 };
 
-const DESKTOP_MODEL_URL =
+const MODEL_URL =
   "/models/condominio-mv2/condominio-mv2-7c5adb14.glb";
-const MOBILE_MODEL_URL =
-  "/models/condominio-mv2/condominio-mv2-mobile.glb";
+const WALK_EYE_HEIGHT = 1.72;
+const WALK_SPEED_METERS_PER_SECOND = 2.4;
+const gateMeshNames = new Set([
+  "Geom3D_91",
+  "Geom3D_93",
+  "Geom3D_95",
+]);
 
 const keyDirections: Partial<Record<string, WalkDirection>> = {
   ArrowDown: "backward",
@@ -48,24 +74,16 @@ const keyDirections: Partial<Record<string, WalkDirection>> = {
   KeyW: "forward",
 };
 
-const keyVerticalDirections: Partial<
-  Record<string, VerticalDirection>
-> = {
-  KeyE: "up",
-  KeyQ: "down",
-  PageDown: "down",
-  PageUp: "up",
-};
-
-function shouldUseMobileModel() {
-  const deviceMemory = (
-    navigator as Navigator & { deviceMemory?: number }
-  ).deviceMemory;
-
-  return (
-    window.matchMedia("(max-width: 767px), (pointer: coarse)").matches ||
-    (deviceMemory !== undefined && deviceMemory <= 4) ||
-    (navigator.hardwareConcurrency ?? 8) <= 4
+function normalizedPointToWorld(
+  point: NormalizedTourPoint,
+  bounds: THREE.Box3,
+  size: THREE.Vector3,
+  y: number,
+) {
+  return new THREE.Vector3(
+    bounds.min.x + size.x * point[0],
+    y,
+    bounds.min.z + size.z * point[1],
   );
 }
 
@@ -99,25 +117,20 @@ function disposeModel(root: THREE.Object3D) {
   geometries.forEach((geometry) => geometry.dispose());
 }
 
-function getWalkStart(bounds: THREE.Box3, size: THREE.Vector3) {
-  const eyeHeight = THREE.MathUtils.clamp(size.y * 0.105, 1.65, 2.1);
-  return new THREE.Vector3(
-    0,
-    bounds.min.y + Math.min(7.4, size.y * 0.45) + eyeHeight,
-    size.z * 0.12,
-  );
-}
-
 export function useCondominiumTour() {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const engineRef = useRef<TourEngine | null>(null);
-  const modeRef = useRef<TourMode>("overview");
+  const modeRef = useRef<TourMode>("walk");
+  const [activeRoute, setActiveRoute] = useState<ActiveRoute | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isPointerLocked, setIsPointerLocked] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [loadProgress, setLoadProgress] = useState(0);
-  const [mode, setMode] = useState<TourMode>("overview");
-  const [quality, setQuality] = useState<TourQuality>("mobile");
+  const [mode, setMode] = useState<TourMode>("walk");
+  const [quality] = useState<TourQuality>("full");
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -126,12 +139,10 @@ export function useCondominiumTour() {
       return;
     }
 
-    const mobileDevice = shouldUseMobileModel();
-    const modelUrl = mobileDevice
-      ? MOBILE_MODEL_URL
-      : DESKTOP_MODEL_URL;
-    setQuality(mobileDevice ? "mobile" : "full");
-
+    const mobileDevice = window.matchMedia(
+      "(max-width: 767px), (pointer: coarse)",
+    ).matches;
+    const finePointer = window.matchMedia("(pointer: fine)").matches;
     let renderer: THREE.WebGLRenderer;
 
     try {
@@ -152,11 +163,13 @@ export function useCondominiumTour() {
     let animationFrame = 0;
     let cancelled = false;
     let draggedPointer: number | null = null;
+    let keyboardRunning = false;
     let lastPointerX = 0;
     let lastPointerY = 0;
     let metrics: ModelMetrics | null = null;
     let modelRoot: THREE.Object3D | null = null;
-    let keyboardRunning = false;
+    let raycastBounds: THREE.Box3 | null = null;
+    let navigation: NavigationState | null = null;
     let runEnabled = false;
     let walkHeightOffset = 0;
     let walkPitch = 0;
@@ -178,12 +191,14 @@ export function useCondominiumTour() {
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xdcecf1);
 
-    const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 2000);
+    const camera = new THREE.PerspectiveCamera(54, 1, 0.08, 2000);
     camera.position.set(80, 60, 90);
+    camera.rotation.order = "YXZ";
 
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.08;
+    renderer.toneMapping = THREE.AgXToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    renderer.shadowMap.enabled = false;
     renderer.domElement.className = "block h-full w-full touch-none";
     renderer.domElement.tabIndex = 0;
     renderer.domElement.setAttribute(
@@ -192,19 +207,29 @@ export function useCondominiumTour() {
     );
     mount.appendChild(renderer.domElement);
 
+    const roomEnvironment = new RoomEnvironment();
+    const pmremGenerator = new THREE.PMREMGenerator(renderer);
+    const environmentTexture = pmremGenerator.fromScene(
+      roomEnvironment,
+      0.04,
+    ).texture;
+    scene.environment = environmentTexture;
+    roomEnvironment.dispose();
+    pmremGenerator.dispose();
+
     const hemisphereLight = new THREE.HemisphereLight(
-      0xf8fcff,
-      0x63776b,
-      2.2,
+      0xf7fbff,
+      0x6a7468,
+      1.55,
     );
     scene.add(hemisphereLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 2.4);
-    directionalLight.position.set(80, 140, 60);
-    scene.add(directionalLight);
+    const sunLight = new THREE.DirectionalLight(0xfff4e4, 2.15);
+    sunLight.position.set(90, 150, 65);
+    scene.add(sunLight);
 
-    const fillLight = new THREE.DirectionalLight(0xb9dcff, 0.9);
-    fillLight.position.set(-90, 50, -70);
+    const fillLight = new THREE.DirectionalLight(0xcce5ff, 0.65);
+    fillLight.position.set(-80, 55, -75);
     scene.add(fillLight);
 
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -215,6 +240,46 @@ export function useCondominiumTour() {
     controls.screenSpacePanning = true;
 
     const overviewTarget = new THREE.Vector3();
+    const groundRaycaster = new THREE.Raycaster();
+    const groundRayOrigin = new THREE.Vector3();
+    const groundRayDirection = new THREE.Vector3(0, -1, 0);
+
+    const resolveSurfaceHeight = (
+      x: number,
+      z: number,
+      fallback: number,
+    ) => {
+      if (!raycastBounds || !modelRoot) {
+        return fallback;
+      }
+
+      groundRayOrigin.set(x, raycastBounds.max.y + 10, z);
+      groundRaycaster.set(groundRayOrigin, groundRayDirection);
+      const surfaces = groundRaycaster
+        .intersectObject(modelRoot, true)
+        .map((intersection) => intersection.point.y);
+
+      return surfaces.length > 0
+        ? Math.min(...surfaces)
+        : fallback;
+    };
+
+    const cancelNavigation = () => {
+      navigation = null;
+      setActiveRoute(null);
+    };
+
+    const clearMovement = () => {
+      keyboardDirections.clear();
+      keyboardVerticalDirections.clear();
+      keyboardRunning = false;
+      touchDirections.backward = false;
+      touchDirections.forward = false;
+      touchDirections.left = false;
+      touchDirections.right = false;
+      touchVerticalDirections.down = false;
+      touchVerticalDirections.up = false;
+    };
 
     const fitOverview = () => {
       if (!metrics) {
@@ -238,7 +303,7 @@ export function useCondominiumTour() {
       camera.position
         .copy(overviewTarget)
         .addScaledVector(direction, distance);
-      camera.near = Math.max(0.1, metrics.maxDimension / 3000);
+      camera.near = Math.max(0.08, metrics.maxDimension / 3000);
       camera.far = metrics.maxDimension * 9;
       camera.updateProjectionMatrix();
 
@@ -248,40 +313,68 @@ export function useCondominiumTour() {
       controls.update();
     };
 
+    const setWalkRotationToward = (target: THREE.Vector3) => {
+      const direction = target.clone().sub(camera.position).setY(0);
+
+      if (direction.lengthSq() < 0.0001) {
+        return;
+      }
+
+      direction.normalize();
+      walkYaw = Math.atan2(-direction.x, -direction.z);
+      walkPitch = 0;
+      camera.rotation.set(walkPitch, walkYaw, 0);
+    };
+
     const setWalkPose = () => {
       if (!metrics) {
         return;
       }
 
-      const lookTarget = new THREE.Vector3(0, metrics.walkHeight, 0);
-
       walkHeightOffset = 0;
+      metrics.walkHeight = metrics.walkStart.y;
       camera.position.copy(metrics.walkStart);
-      if (camera.position.distanceToSquared(lookTarget) < 25) {
-        lookTarget.z -= Math.max(10, metrics.size.z * 0.15);
-      }
-      camera.lookAt(lookTarget);
-      camera.rotation.order = "YXZ";
-
-      const rotation = new THREE.Euler().setFromQuaternion(
-        camera.quaternion,
-        "YXZ",
-      );
-      walkPitch = rotation.x;
-      walkYaw = rotation.y;
-      camera.rotation.set(walkPitch, walkYaw, 0);
+      setWalkRotationToward(metrics.walkTarget);
     };
 
-    const clearMovement = () => {
-      keyboardDirections.clear();
-      keyboardVerticalDirections.clear();
-      keyboardRunning = false;
-      touchDirections.backward = false;
-      touchDirections.forward = false;
-      touchDirections.left = false;
-      touchDirections.right = false;
-      touchVerticalDirections.down = false;
-      touchVerticalDirections.up = false;
+    const requestPointerLock = () => {
+      if (
+        !finePointer ||
+        modeRef.current !== "walk" ||
+        document.pointerLockElement === renderer.domElement
+      ) {
+        return;
+      }
+
+      renderer.domElement.focus({ preventScroll: true });
+      try {
+        const pointerLockRequest =
+          renderer.domElement.requestPointerLock();
+        void pointerLockRequest?.catch(() => {});
+      } catch {
+        // Unsupported embedded browsers keep the touch and keyboard controls.
+      }
+    };
+
+    const applyMode = (nextMode: TourMode, resetPose: boolean) => {
+      modeRef.current = nextMode;
+      clearMovement();
+      cancelNavigation();
+
+      if (!metrics) {
+        return;
+      }
+
+      controls.enabled = nextMode === "overview";
+
+      if (nextMode === "overview") {
+        if (document.pointerLockElement === renderer.domElement) {
+          document.exitPointerLock();
+        }
+        fitOverview();
+      } else if (resetPose) {
+        setWalkPose();
+      }
     };
 
     const updateWalkHeight = (
@@ -305,41 +398,72 @@ export function useCondominiumTour() {
       camera.position.y = metrics.walkHeight + walkHeightOffset;
     };
 
-    const applyMode = (nextMode: TourMode) => {
-      modeRef.current = nextMode;
-      clearMovement();
-
-      if (!metrics) {
-        return;
-      }
-
-      controls.enabled = nextMode === "overview";
-
-      if (nextMode === "overview") {
-        fitOverview();
-      } else {
-        setWalkPose();
-      }
-    };
-
     engineRef.current = {
-      reset: applyMode,
+      cancelNavigation,
+      navigateTo: (destination) => {
+        if (!metrics) {
+          return;
+        }
+
+        modeRef.current = "walk";
+        setMode("walk");
+        controls.enabled = false;
+        const points = destination.waypoints.map((point) => {
+          const worldPoint = normalizedPointToWorld(
+            point,
+            metrics!.bounds,
+            metrics!.size,
+            metrics!.bounds.min.y,
+          );
+          worldPoint.y =
+            resolveSurfaceHeight(
+              worldPoint.x,
+              worldPoint.z,
+              metrics!.walkHeight - WALK_EYE_HEIGHT,
+            ) + WALK_EYE_HEIGHT;
+          return worldPoint;
+        });
+        navigation = {
+          destination,
+          pointIndex: 0,
+          points,
+        };
+        setActiveRoute({
+          id: destination.id,
+          label: destination.label,
+        });
+        requestPointerLock();
+      },
+      reset: (nextMode) => {
+        applyMode(nextMode, true);
+        if (nextMode === "walk") {
+          requestPointerLock();
+        }
+      },
+      setMode: (nextMode) => {
+        const changed = modeRef.current !== nextMode;
+        applyMode(nextMode, changed);
+
+        if (nextMode === "walk") {
+          requestPointerLock();
+        }
+      },
       setRunEnabled: (enabled) => {
         runEnabled = enabled;
       },
-      setMode: applyMode,
       setVerticalDirection: (direction, active) => {
         touchVerticalDirections[direction] = active;
 
         if (active && metrics) {
-          updateWalkHeight(
-            direction,
-            Math.max(0.45, metrics.maxDimension * 0.003),
-          );
+          cancelNavigation();
+          updateWalkHeight(direction, 0.45);
         }
       },
       setWalkDirection: (direction, active) => {
         touchDirections[direction] = active;
+        if (active) {
+          cancelNavigation();
+        }
       },
     };
 
@@ -347,7 +471,7 @@ export function useCondominiumTour() {
       const width = Math.max(1, mount.clientWidth);
       const height = Math.max(1, mount.clientHeight);
       const pixelRatio = mobileDevice
-        ? Math.min(window.devicePixelRatio, 0.9)
+        ? Math.min(window.devicePixelRatio, 0.82)
         : Math.min(window.devicePixelRatio, 1.35);
 
       renderer.setPixelRatio(pixelRatio);
@@ -362,44 +486,67 @@ export function useCondominiumTour() {
 
     const onKeyDown = (event: KeyboardEvent) => {
       const direction = keyDirections[event.code];
-      const verticalDirection = keyVerticalDirections[event.code];
 
       if (modeRef.current !== "walk") {
         return;
       }
 
-      if (event.code === "ShiftLeft" || event.code === "ShiftRight") {
+      if (
+        event.code === "ControlLeft" ||
+        event.code === "ControlRight"
+      ) {
         event.preventDefault();
         keyboardRunning = true;
+        cancelNavigation();
+      } else if (event.code === "Space") {
+        event.preventDefault();
+        keyboardVerticalDirections.add("up");
+        cancelNavigation();
       } else if (direction) {
         event.preventDefault();
         keyboardDirections.add(direction);
-      } else if (verticalDirection) {
-        event.preventDefault();
-        keyboardVerticalDirections.add(verticalDirection);
+        cancelNavigation();
       }
     };
 
     const onKeyUp = (event: KeyboardEvent) => {
       const direction = keyDirections[event.code];
-      const verticalDirection = keyVerticalDirections[event.code];
 
-      if (event.code === "ShiftLeft" || event.code === "ShiftRight") {
+      if (
+        event.code === "ControlLeft" ||
+        event.code === "ControlRight"
+      ) {
         keyboardRunning = false;
+      } else if (event.code === "Space") {
+        keyboardVerticalDirections.delete("up");
       } else if (direction) {
         keyboardDirections.delete(direction);
-      } else if (verticalDirection) {
-        keyboardVerticalDirections.delete(verticalDirection);
       }
     };
 
+    const onMouseMove = (event: MouseEvent) => {
+      if (
+        modeRef.current !== "walk" ||
+        document.pointerLockElement !== renderer.domElement
+      ) {
+        return;
+      }
+
+      walkYaw -= event.movementX * 0.0022;
+      walkPitch = THREE.MathUtils.clamp(
+        walkPitch - event.movementY * 0.0019,
+        -1.25,
+        1.25,
+      );
+      camera.rotation.set(walkPitch, walkYaw, 0);
+    };
+
     const onPointerDown = (event: PointerEvent) => {
-      if (modeRef.current !== "walk") {
+      if (modeRef.current !== "walk" || finePointer) {
         return;
       }
 
       event.preventDefault();
-      renderer.domElement.focus({ preventScroll: true });
       draggedPointer = event.pointerId;
       lastPointerX = event.clientX;
       lastPointerY = event.clientY;
@@ -418,12 +565,11 @@ export function useCondominiumTour() {
       const deltaY = event.clientY - lastPointerY;
       lastPointerX = event.clientX;
       lastPointerY = event.clientY;
-
       walkYaw -= deltaX * 0.004;
       walkPitch = THREE.MathUtils.clamp(
         walkPitch - deltaY * 0.003,
-        -1.1,
-        1.1,
+        -1.15,
+        1.15,
       );
       camera.rotation.set(walkPitch, walkYaw, 0);
     };
@@ -439,6 +585,16 @@ export function useCondominiumTour() {
       draggedPointer = null;
     };
 
+    const onPointerLockChange = () => {
+      const locked =
+        document.pointerLockElement === renderer.domElement;
+      setIsPointerLocked(locked);
+
+      if (!locked) {
+        clearMovement();
+      }
+    };
+
     const onContextLost = (event: Event) => {
       event.preventDefault();
       if (!cancelled) {
@@ -451,6 +607,9 @@ export function useCondominiumTour() {
     window.addEventListener("blur", clearMovement);
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("pointerlockchange", onPointerLockChange);
+    renderer.domElement.addEventListener("click", requestPointerLock);
     renderer.domElement.addEventListener("pointercancel", releasePointer);
     renderer.domElement.addEventListener("pointerdown", onPointerDown);
     renderer.domElement.addEventListener("pointermove", onPointerMove);
@@ -464,7 +623,7 @@ export function useCondominiumTour() {
     const loader = new GLTFLoader();
     loader.setMeshoptDecoder(MeshoptDecoder);
     loader.load(
-      modelUrl,
+      MODEL_URL,
       (gltf) => {
         if (cancelled) {
           disposeModel(gltf.scene);
@@ -490,25 +649,83 @@ export function useCondominiumTour() {
         const bounds = new THREE.Box3().setFromObject(gltf.scene);
         const size = bounds.getSize(new THREE.Vector3());
         const maxDimension = Math.max(size.x, size.y, size.z);
+        raycastBounds = bounds;
+        modelRoot = gltf.scene;
+        const preliminaryWalkStart = normalizedPointToWorld(
+          entrancePosition,
+          bounds,
+          size,
+          bounds.min.y,
+        );
+        const walkHeight =
+          resolveSurfaceHeight(
+            preliminaryWalkStart.x,
+            preliminaryWalkStart.z,
+            bounds.min.y,
+          ) + WALK_EYE_HEIGHT;
+        const maximumAnisotropy =
+          renderer.capabilities.getMaxAnisotropy();
 
         gltf.scene.traverse((object) => {
-          if (object instanceof THREE.Mesh) {
-            object.castShadow = false;
-            object.receiveShadow = false;
+          if (!(object instanceof THREE.Mesh)) {
+            return;
           }
+
+          object.castShadow = false;
+          object.receiveShadow = false;
+
+          if (gateMeshNames.has(object.name)) {
+            const darkenGateMaterial = (material: THREE.Material) => {
+              const gateMaterial = material.clone();
+
+              if (gateMaterial instanceof THREE.MeshStandardMaterial) {
+                gateMaterial.color.set(0x293138);
+                gateMaterial.metalness = 0.68;
+                gateMaterial.roughness = 0.38;
+                gateMaterial.envMapIntensity = 0.75;
+              }
+
+              return gateMaterial;
+            };
+
+            object.material = Array.isArray(object.material)
+              ? object.material.map(darkenGateMaterial)
+              : darkenGateMaterial(object.material);
+          }
+
+          const materials = Array.isArray(object.material)
+            ? object.material
+            : [object.material];
+
+          materials.forEach((material) => {
+            Object.values(material).forEach((value) => {
+              if (value instanceof THREE.Texture) {
+                value.anisotropy = Math.min(
+                  maximumAnisotropy,
+                  mobileDevice ? 2 : 8,
+                );
+                value.needsUpdate = true;
+              }
+            });
+          });
         });
 
-        modelRoot = gltf.scene;
-        const walkStart = getWalkStart(bounds, size);
         metrics = {
           bounds,
           maxDimension,
           size,
-          walkStart,
-          walkHeight: walkStart.y,
+          walkHeight,
+          walkStart: preliminaryWalkStart.setY(walkHeight),
+          walkTarget: normalizedPointToWorld(
+            entranceTarget,
+            bounds,
+            size,
+            walkHeight,
+          ),
         };
         scene.add(modelRoot);
-        applyMode(modeRef.current);
+
+        applyMode(modeRef.current, true);
         setLoadProgress(100);
         setIsLoaded(true);
       },
@@ -565,53 +782,88 @@ export function useCondominiumTour() {
       const delta = Math.min(timer.getDelta(), 0.05);
 
       if (modeRef.current === "walk" && metrics) {
-        const forwardAmount =
-          Number(isMoving("forward")) - Number(isMoving("backward"));
-        const rightAmount =
-          Number(isMoving("right")) - Number(isMoving("left"));
-        const verticalAmount =
-          Number(isMovingVertically("up")) -
-          Number(isMovingVertically("down"));
+        if (navigation) {
+          const target = navigation.points[navigation.pointIndex];
+          const routeDirection = target
+            .clone()
+            .sub(camera.position)
+            .setY(0);
+          const distance = routeDirection.length();
 
-        if (forwardAmount !== 0 || rightAmount !== 0) {
-          forward
-            .set(0, 0, -1)
-            .applyQuaternion(camera.quaternion)
-            .setY(0)
-            .normalize();
-          right.crossVectors(forward, up).normalize();
-          movement
-            .copy(forward)
-            .multiplyScalar(forwardAmount)
-            .addScaledVector(right, rightAmount)
-            .normalize();
+          if (distance < 0.7) {
+            metrics.walkHeight = target.y;
+            walkHeightOffset = 0;
+            navigation.pointIndex += 1;
 
-          camera.position.addScaledVector(
-            movement,
-            metrics.maxDimension *
-              0.035 *
-              (runEnabled || keyboardRunning ? 2 : 1) *
+            if (navigation.pointIndex >= navigation.points.length) {
+              cancelNavigation();
+            }
+          } else {
+            routeDirection.normalize();
+            metrics.walkHeight = THREE.MathUtils.damp(
+              metrics.walkHeight,
+              target.y,
+              7,
               delta,
-          );
-          camera.position.x = THREE.MathUtils.clamp(
-            camera.position.x,
-            metrics.bounds.min.x + 1,
-            metrics.bounds.max.x - 1,
-          );
-          camera.position.z = THREE.MathUtils.clamp(
-            camera.position.z,
-            metrics.bounds.min.z + 1,
-            metrics.bounds.max.z - 1,
-          );
+            );
+            walkHeightOffset = 0;
+            camera.position.addScaledVector(
+              routeDirection,
+              Math.min(
+                distance,
+                WALK_SPEED_METERS_PER_SECOND * 2.5 * delta,
+              ),
+            );
+            setWalkRotationToward(target);
+          }
+        } else {
+          const forwardAmount =
+            Number(isMoving("forward")) - Number(isMoving("backward"));
+          const rightAmount =
+            Number(isMoving("right")) - Number(isMoving("left"));
+          const verticalAmount =
+            Number(isMovingVertically("up")) -
+            Number(isMovingVertically("down"));
+
+          if (forwardAmount !== 0 || rightAmount !== 0) {
+            forward
+              .set(0, 0, -1)
+              .applyQuaternion(camera.quaternion)
+              .setY(0)
+              .normalize();
+            right.crossVectors(forward, up).normalize();
+            movement
+              .copy(forward)
+              .multiplyScalar(forwardAmount)
+              .addScaledVector(right, rightAmount)
+              .normalize();
+
+            camera.position.addScaledVector(
+              movement,
+              WALK_SPEED_METERS_PER_SECOND *
+                (runEnabled || keyboardRunning ? 2 : 1) *
+                delta,
+            );
+          }
+
+          if (verticalAmount !== 0) {
+            updateWalkHeight(
+              verticalAmount > 0 ? "up" : "down",
+              4.2 * delta,
+            );
+          }
         }
 
-        if (verticalAmount !== 0) {
-          updateWalkHeight(
-            verticalAmount > 0 ? "up" : "down",
-            metrics.maxDimension * 0.028 * delta,
-          );
-        }
-
+        camera.position.x = THREE.MathUtils.clamp(
+          camera.position.x,
+          metrics.bounds.min.x + 0.5,
+          metrics.bounds.max.x - 0.5,
+        );
+        camera.position.z = THREE.MathUtils.clamp(
+          camera.position.z,
+          metrics.bounds.min.z + 0.5,
+          metrics.bounds.max.z - 0.5,
+        );
         camera.position.y = metrics.walkHeight + walkHeightOffset;
       }
 
@@ -633,24 +885,49 @@ export function useCondominiumTour() {
       window.removeEventListener("blur", clearMovement);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener(
+        "pointerlockchange",
+        onPointerLockChange,
+      );
+      renderer.domElement.removeEventListener(
+        "click",
+        requestPointerLock,
+      );
       renderer.domElement.removeEventListener(
         "pointercancel",
         releasePointer,
       );
-      renderer.domElement.removeEventListener("pointerdown", onPointerDown);
-      renderer.domElement.removeEventListener("pointermove", onPointerMove);
-      renderer.domElement.removeEventListener("pointerup", releasePointer);
+      renderer.domElement.removeEventListener(
+        "pointerdown",
+        onPointerDown,
+      );
+      renderer.domElement.removeEventListener(
+        "pointermove",
+        onPointerMove,
+      );
+      renderer.domElement.removeEventListener(
+        "pointerup",
+        releasePointer,
+      );
       renderer.domElement.removeEventListener(
         "webglcontextlost",
         onContextLost,
       );
+
+      if (document.pointerLockElement === renderer.domElement) {
+        document.exitPointerLock();
+      }
+
       controls.dispose();
+      environmentTexture.dispose();
 
       if (modelRoot) {
         scene.remove(modelRoot);
         disposeModel(modelRoot);
       }
 
+      raycastBounds = null;
       renderer.dispose();
       renderer.forceContextLoss();
       renderer.domElement.remove();
@@ -658,9 +935,13 @@ export function useCondominiumTour() {
   }, []);
 
   const selectMode = (nextMode: TourMode) => {
-    modeRef.current = nextMode;
     setMode(nextMode);
-    engineRef.current?.setMode(nextMode);
+
+    if (engineRef.current) {
+      engineRef.current.setMode(nextMode);
+    } else {
+      modeRef.current = nextMode;
+    }
   };
 
   const resetView = () => {
@@ -675,6 +956,10 @@ export function useCondominiumTour() {
       engineRef.current?.setRunEnabled(next);
       return next;
     });
+  };
+
+  const navigateTo = (destination: TourDestination) => {
+    engineRef.current?.navigateTo(destination);
   };
 
   const updateVerticalDirection = (
@@ -692,12 +977,15 @@ export function useCondominiumTour() {
   };
 
   return {
+    activeRoute,
     error,
     isLoaded,
+    isPointerLocked,
     isRunning,
     loadProgress,
     mode,
     mountRef,
+    navigateTo,
     quality,
     resetView,
     selectMode,

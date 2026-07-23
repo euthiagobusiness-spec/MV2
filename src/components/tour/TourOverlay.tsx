@@ -2,10 +2,8 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useCallback, useState } from "react";
 import {
   ArrowLeft,
-  Building2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -21,23 +19,28 @@ import {
   TriangleAlert,
 } from "lucide-react";
 
-import { ApartmentTourDrawer } from "@/components/tour/ApartmentTourDrawer";
+import { EntranceGuidePanel } from "@/components/tour/EntranceGuidePanel";
 import type {
+  TourDestination,
   TourMode,
-  TourQuality,
   VerticalDirection,
   WalkDirection,
 } from "@/components/tour/tour-types";
 
 type TourOverlayProps = {
+  activeRoute: {
+    id: TourDestination["id"];
+    label: string;
+  } | null;
   error: string | null;
   isFullscreen: boolean;
   isLoaded: boolean;
+  isPointerLocked: boolean;
   isRunning: boolean;
   loadProgress: number;
   mode: TourMode;
-  quality: TourQuality;
   onModeChange: (mode: TourMode) => void;
+  onNavigate: (destination: TourDestination) => void;
   onReset: () => void;
   onRetry: () => void;
   onRunToggle: () => void;
@@ -212,14 +215,16 @@ function ModeSwitcher({
 }
 
 export function TourOverlay({
+  activeRoute,
   error,
   isFullscreen,
   isLoaded,
+  isPointerLocked,
   isRunning,
   loadProgress,
   mode,
-  quality,
   onModeChange,
+  onNavigate,
   onReset,
   onRetry,
   onRunToggle,
@@ -227,9 +232,6 @@ export function TourOverlay({
   onVerticalDirectionChange,
   onWalkDirectionChange,
 }: TourOverlayProps) {
-  const [apartmentsOpen, setApartmentsOpen] = useState(false);
-  const closeApartments = useCallback(() => setApartmentsOpen(false), []);
-
   return (
     <>
       <div
@@ -296,7 +298,7 @@ export function TourOverlay({
             role="status"
           >
             <p className="text-sm font-black text-slate-950">
-              Preparando o condominio
+              Preparando o condominio completo
             </p>
             <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-200">
               <div
@@ -306,9 +308,7 @@ export function TourOverlay({
             </div>
             <div className="mt-2 flex items-center justify-between gap-3 text-xs font-bold text-slate-600">
               <span>{loadProgress}% carregado</span>
-              <span>
-                {quality === "mobile" ? "Versao leve" : "Alta qualidade"}
-              </span>
+              <span>Materiais e paisagismo</span>
             </div>
           </div>
         ) : null}
@@ -333,117 +333,113 @@ export function TourOverlay({
           </div>
         ) : null}
 
-        <div className="mt-auto grid gap-2">
-          {isLoaded ? (
-            <div className="flex items-end justify-between gap-2">
-              <div className="grid gap-2">
-                <button
-                  aria-label="Abrir apartamentos"
-                  className="pointer-events-auto flex min-h-12 items-center gap-2 rounded-md bg-white/95 px-3 text-xs font-black text-slate-900 shadow-md ring-1 ring-slate-900/10 transition hover:bg-white sm:text-sm"
-                  onClick={() => setApartmentsOpen(true)}
-                  type="button"
-                >
-                  <Building2 className="text-sky-700" size={18} />
-                  <span className={mode === "walk" ? "hidden sm:inline" : ""}>
-                    Apartamentos
-                  </span>
-                </button>
-                <p className="hidden rounded-md bg-slate-950/82 px-3 py-2 text-xs font-bold leading-5 text-white shadow-md sm:block">
-                  {mode === "overview"
-                    ? "Arraste para girar e use o zoom para aproximar."
-                    : "Arraste para olhar. Use WASD, as setas ou os controles."}
-                </p>
-              </div>
-
-              {mode === "walk" ? (
-                <div
-                  aria-label="Controles de caminhada"
-                  className="pointer-events-auto flex shrink-0 items-end gap-2"
-                >
-                  <div className="grid w-[148px] grid-cols-3 gap-1">
-                    <span />
-                    <WalkButton
-                      direction="forward"
-                      label="Caminhar para frente"
-                      onDirectionChange={onWalkDirectionChange}
-                    >
-                      <ChevronUp size={24} />
-                    </WalkButton>
-                    <span />
-                    <WalkButton
-                      direction="left"
-                      label="Caminhar para a esquerda"
-                      onDirectionChange={onWalkDirectionChange}
-                    >
-                      <ChevronLeft size={24} />
-                    </WalkButton>
-                    <WalkButton
-                      direction="backward"
-                      label="Caminhar para tras"
-                      onDirectionChange={onWalkDirectionChange}
-                    >
-                      <ChevronDown size={24} />
-                    </WalkButton>
-                    <WalkButton
-                      direction="right"
-                      label="Caminhar para a direita"
-                      onDirectionChange={onWalkDirectionChange}
-                    >
-                      <ChevronRight size={24} />
-                    </WalkButton>
-                  </div>
-
-                  <div className="grid w-[82px] gap-1">
-                    <button
-                      aria-pressed={isRunning}
-                      className={`flex min-h-12 items-center justify-center gap-1 rounded-md px-2 text-[11px] font-black text-white shadow-md ring-1 ring-white/20 transition ${
-                        isRunning ? "bg-sky-600" : "bg-slate-950/88"
-                      }`}
-                      onClick={onRunToggle}
-                      title="Correr em velocidade 2x"
-                      type="button"
-                    >
-                      <FastForward size={17} />
-                      Correr
-                    </button>
-                    <HoldButton
-                      label="Subir enquanto estiver pressionado"
-                      onActiveChange={(active) =>
-                        onVerticalDirectionChange("up", active)
-                      }
-                    >
-                      <span className="flex items-center gap-1 text-[11px] font-black">
-                        <MoveUp size={17} />
-                        Subir
-                      </span>
-                    </HoldButton>
-                    <HoldButton
-                      label="Descer enquanto estiver pressionado"
-                      onActiveChange={(active) =>
-                        onVerticalDirectionChange("down", active)
-                      }
-                    >
-                      <MoveDown size={19} />
-                    </HoldButton>
-                  </div>
-                </div>
-              ) : null}
+        {isLoaded && mode === "walk" && isPointerLocked ? (
+          <>
+            <div
+              aria-hidden="true"
+              className="absolute left-1/2 top-1/2 hidden size-5 -translate-x-1/2 -translate-y-1/2 sm:block"
+            >
+              <span className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-white/75 shadow" />
+              <span className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-white/75 shadow" />
             </div>
-          ) : null}
+            <p className="absolute bottom-4 left-1/2 hidden -translate-x-1/2 rounded-md bg-slate-950/78 px-4 py-2 text-center text-xs font-bold text-white shadow-lg sm:block">
+              WASD mover | CTRL correr | ESPACO subir | ESC liberar cursor
+            </p>
+          </>
+        ) : null}
 
-          <ModeSwitcher
-            className="flex w-full sm:hidden"
-            isLoaded={isLoaded}
-            mode={mode}
-            onModeChange={onModeChange}
-          />
-        </div>
+        {isLoaded && mode === "walk" ? (
+          <div
+            aria-label="Controles de caminhada"
+            className="pointer-events-auto mt-auto flex items-end justify-between gap-2 sm:hidden"
+          >
+            <div className="grid w-[148px] grid-cols-3 gap-1">
+              <span />
+              <WalkButton
+                direction="forward"
+                label="Caminhar para frente"
+                onDirectionChange={onWalkDirectionChange}
+              >
+                <ChevronUp size={24} />
+              </WalkButton>
+              <span />
+              <WalkButton
+                direction="left"
+                label="Caminhar para a esquerda"
+                onDirectionChange={onWalkDirectionChange}
+              >
+                <ChevronLeft size={24} />
+              </WalkButton>
+              <WalkButton
+                direction="backward"
+                label="Caminhar para tras"
+                onDirectionChange={onWalkDirectionChange}
+              >
+                <ChevronDown size={24} />
+              </WalkButton>
+              <WalkButton
+                direction="right"
+                label="Caminhar para a direita"
+                onDirectionChange={onWalkDirectionChange}
+              >
+                <ChevronRight size={24} />
+              </WalkButton>
+            </div>
+
+            <div className="grid w-[82px] gap-1">
+              <button
+                aria-pressed={isRunning}
+                className={`flex min-h-12 items-center justify-center gap-1 rounded-md px-2 text-[11px] font-black text-white shadow-md ring-1 ring-white/20 transition ${
+                  isRunning ? "bg-sky-600" : "bg-slate-950/88"
+                }`}
+                onClick={onRunToggle}
+                title="Correr em velocidade 2x"
+                type="button"
+              >
+                <FastForward size={17} />
+                Correr
+              </button>
+              <HoldButton
+                label="Subir enquanto estiver pressionado"
+                onActiveChange={(active) =>
+                  onVerticalDirectionChange("up", active)
+                }
+              >
+                <span className="flex items-center gap-1 text-[11px] font-black">
+                  <MoveUp size={17} />
+                  Subir
+                </span>
+              </HoldButton>
+              <HoldButton
+                label="Descer enquanto estiver pressionado"
+                onActiveChange={(active) =>
+                  onVerticalDirectionChange("down", active)
+                }
+              >
+                <MoveDown size={19} />
+              </HoldButton>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-auto" />
+        )}
+
+        <ModeSwitcher
+          className="flex w-full sm:hidden"
+          isLoaded={isLoaded}
+          mode={mode}
+          onModeChange={onModeChange}
+        />
       </div>
 
-      <ApartmentTourDrawer
-        isOpen={apartmentsOpen}
-        onClose={closeApartments}
-      />
+      {isLoaded && !error ? (
+        <EntranceGuidePanel
+          activeRoute={activeRoute}
+          isPointerLocked={isPointerLocked}
+          onNavigate={onNavigate}
+          onResumeWalk={() => onModeChange("walk")}
+        />
+      ) : null}
     </>
   );
 }
