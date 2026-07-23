@@ -1,0 +1,22 @@
+# Local source assets and operator-only files
+/Imagens dos apartamentos/
+/AGENTS.md
+/CLAUDE.md
+
+# Desktop application artifacts are not part of the web deployment
+/desktop/
+*.exe
+*.blockmap
+
+# Local runtime, credentials, and generated artifacts
+/.git/
+/.next/
+/.vercel/
+/.playwright-cli/
+/certificates/
+/data/
+/node_modules/
+/output/
+.env*
+*.pem
+*.skp
