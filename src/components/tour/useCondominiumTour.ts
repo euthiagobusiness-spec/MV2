@@ -14,6 +14,9 @@ import {
   entranceTarget,
 } from "@/components/tour/tour-locations";
 import {
+  shouldRenderTourMaterialDoubleSided,
+} from "@/components/tour/tour-material-corrections";
+import {
   DEFAULT_TOUR_VISUAL_SETTINGS,
   parseStoredTourVisualSettings,
 } from "@/components/tour/tour-visual-settings";
@@ -198,6 +201,7 @@ export function useCondominiumTour() {
     let lastPointerY = 0;
     let metrics: ModelMetrics | null = null;
     let modelRoot: THREE.Object3D | null = null;
+    let entranceGround: THREE.Mesh | null = null;
     let raycastBounds: THREE.Box3 | null = null;
     let navigation: NavigationState | null = null;
     let runEnabled = false;
@@ -881,9 +885,27 @@ export function useCondominiumTour() {
 
           materials.forEach((material) => {
             if (material instanceof THREE.MeshStandardMaterial) {
+              const isFirstMaterialVisit =
+                !managedMaterials.has(material);
+
+              if (isFirstMaterialVisit) {
+                if (!material.map) {
+                  material.color.convertSRGBToLinear();
+                }
+
+                if (
+                  shouldRenderTourMaterialDoubleSided(
+                    material.name,
+                  )
+                ) {
+                  material.side = THREE.DoubleSide;
+                }
+              }
+
               managedMaterials.add(material);
               material.envMapIntensity =
                 0.28 * activeVisualSettings.lightIntensity;
+              material.needsUpdate = true;
             }
 
             Object.values(material).forEach((value) => {
@@ -901,6 +923,43 @@ export function useCondominiumTour() {
             });
           });
         });
+
+        const entranceConcrete = [...managedMaterials].find(
+          (material) => material.name === "Concrete_06_1K",
+        );
+
+        if (entranceConcrete) {
+          const groundMaterial = entranceConcrete.clone();
+          const groundTexture = entranceConcrete.map?.clone() ?? null;
+
+          if (groundTexture) {
+            groundTexture.wrapS = THREE.RepeatWrapping;
+            groundTexture.wrapT = THREE.RepeatWrapping;
+            groundTexture.repeat.set(6, 5);
+            groundTexture.needsUpdate = true;
+          }
+
+          groundMaterial.color.setRGB(1, 1, 1);
+          groundMaterial.map = groundTexture;
+          groundMaterial.metalness = 0;
+          groundMaterial.roughness = 1;
+          groundMaterial.side = THREE.DoubleSide;
+          groundMaterial.needsUpdate = true;
+
+          entranceGround = new THREE.Mesh(
+            new THREE.PlaneGeometry(26, 18),
+            groundMaterial,
+          );
+          entranceGround.name = "MV2_Portaria_Concreto";
+          entranceGround.rotation.x = -Math.PI / 2;
+          entranceGround.position.set(
+            preliminaryWalkStart.x - 6,
+            groundReferenceHeight + 0.015,
+            preliminaryWalkStart.z,
+          );
+          entranceGround.receiveShadow = !mobileDevice;
+          scene.add(entranceGround);
+        }
 
         metrics = {
           bounds,
@@ -1164,6 +1223,15 @@ export function useCondominiumTour() {
       if (modelRoot) {
         scene.remove(modelRoot);
         disposeModel(modelRoot);
+      }
+
+      if (entranceGround) {
+        scene.remove(entranceGround);
+        entranceGround.geometry.dispose();
+        const entranceGroundMaterial =
+          entranceGround.material as THREE.MeshStandardMaterial;
+        entranceGroundMaterial.map?.dispose();
+        entranceGroundMaterial.dispose();
       }
 
       raycastBounds = null;
