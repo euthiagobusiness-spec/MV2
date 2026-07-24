@@ -19,6 +19,7 @@
 /Atualização/
 /Projeto MV2 Sketch/
 *.skp
+*.skb
 
 # next.js
 /.next/
