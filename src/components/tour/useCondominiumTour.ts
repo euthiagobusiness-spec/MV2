@@ -7,15 +7,21 @@ import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { KTX2Loader } from "three/examples/jsm/loaders/KTX2Loader.js";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 
 import {
   entrancePosition,
   entranceTarget,
 } from "@/components/tour/tour-locations";
+import {
+  DEFAULT_TOUR_VISUAL_SETTINGS,
+  parseStoredTourVisualSettings,
+} from "@/components/tour/tour-visual-settings";
 import type {
   NormalizedTourPoint,
   TourDestination,
   TourMode,
+  TourVisualSettings,
   VerticalDirection,
   WalkDirection,
 } from "@/components/tour/tour-types";
@@ -47,6 +53,7 @@ type TourEngine = {
   setMobileMovement: (right: number, forward: number) => void;
   setMode: (mode: TourMode) => void;
   setRunEnabled: (enabled: boolean) => void;
+  setVisualSettings: (settings: TourVisualSettings) => void;
   setVerticalDirection: (
     direction: VerticalDirection,
     active: boolean,
@@ -54,12 +61,14 @@ type TourEngine = {
 };
 
 const MODEL_URL =
-  "/models/condominio-mv2/condominio-mv2-completo-c866bf2b.glb";
+  "/models/condominio-mv2/condominio-mv2-fidelidade-c866bf2b.glb";
 const WALK_EYE_HEIGHT = 1.72;
 const BASE_WALK_SPEED_METERS_PER_SECOND = 2.4;
 const WALK_SPEED_MULTIPLIER = 5;
 const RUN_SPEED_MULTIPLIER = 10;
 const AUTOMATIC_ROUTE_SPEED_MULTIPLIER = 2.5;
+const VISUAL_SETTINGS_STORAGE_KEY = "mv2-tour-visual-settings";
+const GROUND_HEIGHT_REFERENCE: NormalizedTourPoint = [0.483, 0.892];
 
 const keyDirections: Partial<Record<string, WalkDirection>> = {
   ArrowDown: "backward",
@@ -128,6 +137,29 @@ export function useCondominiumTour() {
   const [isRunning, setIsRunning] = useState(false);
   const [loadProgress, setLoadProgress] = useState(0);
   const [mode, setMode] = useState<TourMode>("walk");
+  const [visualSettings, setVisualSettings] =
+    useState<TourVisualSettings>(DEFAULT_TOUR_VISUAL_SETTINGS);
+  const visualSettingsRef = useRef<TourVisualSettings>(
+    DEFAULT_TOUR_VISUAL_SETTINGS,
+  );
+
+  useEffect(() => {
+    const storedSettings = parseStoredTourVisualSettings(
+      window.localStorage.getItem(VISUAL_SETTINGS_STORAGE_KEY),
+    );
+
+    if (!storedSettings) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      visualSettingsRef.current = storedSettings;
+      setVisualSettings(storedSettings);
+      engineRef.current?.setVisualSettings(storedSettings);
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, []);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -159,6 +191,7 @@ export function useCondominiumTour() {
 
     let animationFrame = 0;
     let cancelled = false;
+    let contextLost = false;
     let draggedPointer: number | null = null;
     let keyboardRunning = false;
     let lastPointerX = 0;
@@ -182,17 +215,18 @@ export function useCondominiumTour() {
     };
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xaedff2);
+    scene.background = new THREE.Color(0x747d8c);
 
     const camera = new THREE.PerspectiveCamera(54, 1, 0.08, 2000);
     camera.position.set(80, 60, 90);
     camera.rotation.order = "YXZ";
 
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.28;
+    renderer.toneMapping = THREE.NeutralToneMapping;
+    renderer.toneMappingExposure =
+      visualSettingsRef.current.exposure;
     renderer.shadowMap.enabled = !mobileDevice;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.shadowMap.autoUpdate = false;
     renderer.domElement.className = "block h-full w-full touch-none";
     renderer.domElement.tabIndex = 0;
@@ -213,16 +247,16 @@ export function useCondominiumTour() {
     pmremGenerator.dispose();
 
     const hemisphereLight = new THREE.HemisphereLight(
-      0xf8fdff,
-      0x65735a,
-      1.85,
+      0xe7eef5,
+      0x343941,
+      0.68,
     );
     scene.add(hemisphereLight);
 
-    const sunLight = new THREE.DirectionalLight(0xfff1d6, 3.1);
+    const sunLight = new THREE.DirectionalLight(0xffefd8, 1.55);
     sunLight.position.set(105, 165, 82);
     sunLight.castShadow = !mobileDevice;
-    sunLight.shadow.mapSize.set(2048, 2048);
+    sunLight.shadow.mapSize.set(1024, 1024);
     sunLight.shadow.camera.left = -165;
     sunLight.shadow.camera.right = 165;
     sunLight.shadow.camera.top = 165;
@@ -233,11 +267,82 @@ export function useCondominiumTour() {
     sunLight.shadow.normalBias = 0.035;
     scene.add(sunLight);
 
-    const fillLight = new THREE.DirectionalLight(0xc9e8ff, 0.9);
+    const fillLight = new THREE.DirectionalLight(0xc9e8ff, 0.22);
     fillLight.position.set(-80, 55, -75);
     scene.add(fillLight);
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.28));
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.08);
+    scene.add(ambientLight);
+
+    const outputPass = new OutputPass();
+    outputPass.renderToScreen = true;
+    const drawingBufferSize = new THREE.Vector2();
+    const managedMaterials = new Set<THREE.MeshStandardMaterial>();
+    let activeVisualSettings = visualSettingsRef.current;
+    let multisampleTarget: THREE.WebGLRenderTarget | null = null;
+    let multisampleCount = -1;
+
+    const resizeMultisampleTarget = () => {
+      if (!multisampleTarget) {
+        return;
+      }
+
+      renderer.getDrawingBufferSize(drawingBufferSize);
+      multisampleTarget.setSize(
+        Math.max(1, Math.round(drawingBufferSize.x)),
+        Math.max(1, Math.round(drawingBufferSize.y)),
+      );
+    };
+
+    const updateMultisampleTarget = (requestedSamples: number) => {
+      const samples = Math.min(
+        requestedSamples,
+        renderer.capabilities.maxSamples,
+      );
+
+      if (samples === multisampleCount) {
+        return;
+      }
+
+      multisampleTarget?.dispose();
+      multisampleTarget = null;
+      multisampleCount = samples;
+
+      if (samples === 0) {
+        return;
+      }
+
+      multisampleTarget = new THREE.WebGLRenderTarget(1, 1, {
+        depthBuffer: true,
+        magFilter: THREE.LinearFilter,
+        minFilter: THREE.LinearFilter,
+        stencilBuffer: false,
+        type: THREE.UnsignedByteType,
+      });
+      multisampleTarget.samples = samples;
+      multisampleTarget.texture.name = `MV2 ${samples}x MSAA`;
+      resizeMultisampleTarget();
+    };
+
+    const applyVisualSettings = (settings: TourVisualSettings) => {
+      activeVisualSettings = settings;
+      renderer.toneMappingExposure = settings.exposure;
+      renderer.domElement.style.filter =
+        `contrast(${settings.contrast}) saturate(${settings.saturation})`;
+      hemisphereLight.intensity = 0.68 * settings.lightIntensity;
+      sunLight.intensity = 1.55 * settings.lightIntensity;
+      fillLight.intensity = 0.22 * settings.lightIntensity;
+      ambientLight.intensity = 0.08 * settings.lightIntensity;
+
+      managedMaterials.forEach((material) => {
+        material.envMapIntensity = 0.28 * settings.lightIntensity;
+        material.needsUpdate = true;
+      });
+
+      updateMultisampleTarget(settings.msaaSamples);
+    };
+
+    applyVisualSettings(activeVisualSettings);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -344,6 +449,7 @@ export function useCondominiumTour() {
 
     const requestPointerLock = () => {
       if (
+        mobileDevice ||
         !finePointer ||
         modeRef.current !== "walk" ||
         document.pointerLockElement === renderer.domElement
@@ -464,6 +570,10 @@ export function useCondominiumTour() {
       setRunEnabled: (enabled) => {
         runEnabled = enabled;
       },
+      setVisualSettings: (settings) => {
+        applyVisualSettings(settings);
+        resizeRenderer();
+      },
       setVerticalDirection: (direction, active) => {
         touchVerticalDirections[direction] = active;
 
@@ -477,12 +587,26 @@ export function useCondominiumTour() {
     const resizeRenderer = () => {
       const width = Math.max(1, mount.clientWidth);
       const height = Math.max(1, mount.clientHeight);
-      const pixelRatio = mobileDevice
-        ? Math.min(window.devicePixelRatio, 0.82)
-        : Math.min(window.devicePixelRatio, 1.35);
+      const requestedSamples = activeVisualSettings.msaaSamples;
+      const pixelRatioLimit = mobileDevice
+        ? requestedSamples >= 4
+          ? 0.72
+          : requestedSamples >= 2
+            ? 0.82
+            : 0.92
+        : requestedSamples >= 4
+          ? 1
+          : requestedSamples >= 2
+            ? 1.18
+            : 1.28;
+      const pixelRatio = Math.min(
+        window.devicePixelRatio,
+        pixelRatioLimit,
+      );
 
       renderer.setPixelRatio(pixelRatio);
       renderer.setSize(width, height, false);
+      resizeMultisampleTarget();
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
     };
@@ -616,11 +740,29 @@ export function useCondominiumTour() {
 
     const onContextLost = (event: Event) => {
       event.preventDefault();
+      contextLost = true;
       if (!cancelled) {
         setError(
-          "O passeio 3D foi interrompido pelo navegador. Recarregue a pagina para continuar.",
+          "O navegador pausou a placa de video. O passeio sera retomado automaticamente.",
         );
       }
+    };
+
+    const onContextRestored = () => {
+      contextLost = false;
+      setError(null);
+      applyVisualSettings(activeVisualSettings);
+      resizeRenderer();
+
+      managedMaterials.forEach((material) => {
+        Object.values(material).forEach((value) => {
+          if (value instanceof THREE.Texture) {
+            value.needsUpdate = true;
+          }
+        });
+      });
+
+      renderer.shadowMap.needsUpdate = !mobileDevice;
     };
 
     window.addEventListener("blur", clearMovement);
@@ -636,6 +778,11 @@ export function useCondominiumTour() {
     renderer.domElement.addEventListener(
       "webglcontextlost",
       onContextLost,
+      false,
+    );
+    renderer.domElement.addEventListener(
+      "webglcontextrestored",
+      onContextRestored,
       false,
     );
 
@@ -674,6 +821,17 @@ export function useCondominiumTour() {
         const maxDimension = Math.max(size.x, size.y, size.z);
         raycastBounds = bounds;
         modelRoot = gltf.scene;
+        const groundReferencePoint = normalizedPointToWorld(
+          GROUND_HEIGHT_REFERENCE,
+          bounds,
+          size,
+          bounds.min.y,
+        );
+        const groundReferenceHeight = resolveSurfaceHeight(
+          groundReferencePoint.x,
+          groundReferencePoint.z,
+          bounds.min.y,
+        );
         const preliminaryWalkStart = normalizedPointToWorld(
           entrancePosition,
           bounds,
@@ -684,38 +842,59 @@ export function useCondominiumTour() {
           resolveSurfaceHeight(
             preliminaryWalkStart.x,
             preliminaryWalkStart.z,
-            bounds.min.y,
+            groundReferenceHeight,
           ) + WALK_EYE_HEIGHT;
         const maximumAnisotropy =
           renderer.capabilities.getMaxAnisotropy();
+        const casterMaterialPattern =
+          /brick|roof|wood|plywood|plaster|wall|metal/i;
+        const receiverMaterialPattern =
+          /asphalt|concrete|gravel|ground|pavement|soil|stone/i;
 
         gltf.scene.traverse((object) => {
           if (!(object instanceof THREE.Mesh)) {
             return;
           }
 
-          object.castShadow = !mobileDevice;
-          object.receiveShadow = true;
-
           const materials = Array.isArray(object.material)
             ? object.material
             : [object.material];
+          const materialNames = materials
+            .map((material) => material.name)
+            .join(" ");
+          const positionCount =
+            object.geometry.getAttribute("position")?.count ?? 0;
+          const triangleCount = object.geometry.index
+            ? object.geometry.index.count / 3
+            : positionCount / 3;
+          const isSelectableShadowMesh = materials.length <= 4;
+
+          object.castShadow =
+            !mobileDevice &&
+            isSelectableShadowMesh &&
+            triangleCount < 350_000 &&
+            casterMaterialPattern.test(materialNames);
+          object.receiveShadow =
+            !mobileDevice &&
+            isSelectableShadowMesh &&
+            receiverMaterialPattern.test(materialNames);
 
           materials.forEach((material) => {
             if (material instanceof THREE.MeshStandardMaterial) {
-              material.envMapIntensity = 0.72;
-              material.roughness = THREE.MathUtils.clamp(
-                material.roughness * 0.9,
-                0.28,
-                1,
-              );
+              managedMaterials.add(material);
+              material.envMapIntensity =
+                0.28 * activeVisualSettings.lightIntensity;
             }
 
             Object.values(material).forEach((value) => {
               if (value instanceof THREE.Texture) {
                 value.anisotropy = Math.min(
                   maximumAnisotropy,
-                  mobileDevice ? 2 : 8,
+                  mobileDevice
+                    ? activeVisualSettings.msaaSamples >= 4
+                      ? 4
+                      : 2
+                    : 8,
                 );
                 value.needsUpdate = true;
               }
@@ -785,6 +964,7 @@ export function useCondominiumTour() {
 
       if (
         document.hidden ||
+        contextLost ||
         (minimumFrameInterval > 0 &&
           timestamp - lastFrameTime < minimumFrameInterval)
       ) {
@@ -902,7 +1082,28 @@ export function useCondominiumTour() {
         controls.update();
       }
 
-      renderer.render(scene, camera);
+      try {
+        if (multisampleTarget) {
+          renderer.setRenderTarget(multisampleTarget);
+          renderer.clear();
+          renderer.render(scene, camera);
+          outputPass.render(
+            renderer,
+            multisampleTarget,
+            multisampleTarget,
+            0,
+            false,
+          );
+        } else {
+          renderer.setRenderTarget(null);
+          renderer.render(scene, camera);
+        }
+      } catch {
+        contextLost = true;
+        setError(
+          "O navegador interrompeu a renderizacao. Recarregue a pagina para reiniciar o passeio.",
+        );
+      }
     };
 
     render(performance.now());
@@ -945,6 +1146,10 @@ export function useCondominiumTour() {
         "webglcontextlost",
         onContextLost,
       );
+      renderer.domElement.removeEventListener(
+        "webglcontextrestored",
+        onContextRestored,
+      );
 
       if (document.pointerLockElement === renderer.domElement) {
         document.exitPointerLock();
@@ -953,6 +1158,8 @@ export function useCondominiumTour() {
       controls.dispose();
       ktx2Loader.dispose();
       environmentTexture.dispose();
+      multisampleTarget?.dispose();
+      outputPass.dispose();
 
       if (modelRoot) {
         scene.remove(modelRoot);
@@ -1005,6 +1212,16 @@ export function useCondominiumTour() {
     engineRef.current?.setMobileMovement(right, forward);
   };
 
+  const updateVisualSettings = (settings: TourVisualSettings) => {
+    visualSettingsRef.current = settings;
+    setVisualSettings(settings);
+    window.localStorage.setItem(
+      VISUAL_SETTINGS_STORAGE_KEY,
+      JSON.stringify(settings),
+    );
+    engineRef.current?.setVisualSettings(settings);
+  };
+
   return {
     activeRoute,
     error,
@@ -1019,6 +1236,8 @@ export function useCondominiumTour() {
     selectMode,
     toggleRunning,
     updateMobileMovement,
+    updateVisualSettings,
     updateVerticalDirection,
+    visualSettings,
   };
 }

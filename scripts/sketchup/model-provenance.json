@@ -9,9 +9,9 @@
     "texturedMaterials": 32
   },
   "webAsset": {
-    "file": "condominio-mv2-completo-c866bf2b.glb",
-    "bytes": 55261960,
-    "sha256": "C2ACDD1DB03B100E0B86FFA084CE1CBDB1079E0DBA2134A0805508328B123994",
+    "file": "condominio-mv2-fidelidade-c866bf2b.glb",
+    "bytes": 82630168,
+    "sha256": "33C67703B59CF740825AE287E0E713C9A7A2530147BC50BCCEFC56AAF1A366C1",
     "triangles": 7526946,
     "materials": 248,
     "textures": 27,
@@ -19,6 +19,7 @@
     "geometrySimplification": false,
     "positionQuantizationBits": 16,
     "textureCoordinateQuantizationBits": 16,
-    "textureFormat": "KTX2"
+    "normalQuantizationBits": 12,
+    "textureFormat": "KTX2 UASTC"
   }
 }

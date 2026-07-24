@@ -3,8 +3,8 @@ import type {
   TourDestination,
 } from "@/components/tour/tour-types";
 
-export const entrancePosition: NormalizedTourPoint = [0.483, 0.892];
-export const entranceTarget: NormalizedTourPoint = [0.463, 0.883];
+export const entrancePosition: NormalizedTourPoint = [0.112, 0.568];
+export const entranceTarget: NormalizedTourPoint = [0.145, 0.57];
 
 export const commonAreaDestinations: TourDestination[] = [
   {

@@ -1,24 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import {
   ArrowLeft,
   Footprints,
+  LogOut,
   Maximize2,
   Minimize2,
   Orbit,
   Play,
   RotateCcw,
-  RotateCw,
   TriangleAlert,
 } from "lucide-react";
 
 import { EntranceGuidePanel } from "@/components/tour/EntranceGuidePanel";
 import { MobileTourControls } from "@/components/tour/MobileTourControls";
+import { TourVisualSettingsPanel } from "@/components/tour/TourVisualSettingsPanel";
 import type {
   TourDestination,
   TourMode,
+  TourVisualSettings,
   VerticalDirection,
 } from "@/components/tour/tour-types";
 
@@ -37,6 +39,7 @@ type TourOverlayProps = {
   isRunning: boolean;
   loadProgress: number;
   mode: TourMode;
+  onExitMobileTour: () => void;
   onModeChange: (mode: TourMode) => void;
   onMobileMovementChange: (
     right: number,
@@ -48,10 +51,12 @@ type TourOverlayProps = {
   onRunToggle: () => void;
   onStartMobileTour: () => void;
   onToggleFullscreen: () => void;
+  onVisualSettingsChange: (settings: TourVisualSettings) => void;
   onVerticalDirectionChange: (
     direction: VerticalDirection,
     active: boolean,
   ) => void;
+  visualSettings: TourVisualSettings;
 };
 
 function ModeButton({
@@ -72,7 +77,7 @@ function ModeButton({
   return (
     <button
       aria-pressed={active}
-      className={`flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md px-3 text-xs font-black transition sm:min-h-10 sm:flex-none sm:text-sm ${
+      className={`flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-md px-2.5 text-[11px] font-black transition sm:flex-none sm:px-3 sm:text-xs ${
         active
           ? "bg-sky-700 text-white"
           : "text-slate-700 hover:bg-slate-100"
@@ -108,7 +113,7 @@ function IconButton({
   return (
     <button
       aria-label={label}
-      className="grid size-11 place-items-center rounded-md bg-white/95 text-slate-800 shadow-md ring-1 ring-slate-900/10 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-45 sm:size-10"
+      className="grid size-9 place-items-center rounded-md bg-white/78 text-slate-800 shadow-md ring-1 ring-slate-900/10 backdrop-blur-sm transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
       disabled={disabled}
       onClick={onClick}
       title={label}
@@ -132,16 +137,15 @@ function ModeSwitcher({
 }) {
   return (
     <div
-      className={`pointer-events-auto rounded-lg bg-white/95 p-1 shadow-md ring-1 ring-slate-900/10 ${className}`}
+      className={`pointer-events-auto rounded-md bg-white/78 p-1 shadow-md ring-1 ring-slate-900/10 backdrop-blur-sm ${className}`}
     >
       <ModeButton
         active={mode === "overview"}
         disabled={!isLoaded}
         label="Vista geral"
         onClick={() => onModeChange("overview")}
-        shortLabel="Geral"
       >
-        <Orbit size={17} />
+        <Orbit size={15} />
       </ModeButton>
       <ModeButton
         active={mode === "walk"}
@@ -149,7 +153,7 @@ function ModeSwitcher({
         label="Caminhar"
         onClick={() => onModeChange("walk")}
       >
-        <Footprints size={17} />
+        <Footprints size={15} />
       </ModeButton>
     </div>
   );
@@ -167,6 +171,7 @@ export function TourOverlay({
   isRunning,
   loadProgress,
   mode,
+  onExitMobileTour,
   onModeChange,
   onMobileMovementChange,
   onNavigate,
@@ -175,8 +180,12 @@ export function TourOverlay({
   onRunToggle,
   onStartMobileTour,
   onToggleFullscreen,
+  onVisualSettingsChange,
   onVerticalDirectionChange,
+  visualSettings,
 }: TourOverlayProps) {
+  const [visualSettingsOpen, setVisualSettingsOpen] = useState(false);
+
   return (
     <>
       <div
@@ -186,18 +195,18 @@ export function TourOverlay({
           paddingTop: "max(0.75rem, env(safe-area-inset-top))",
         }}
       >
-        <div className="flex items-start justify-between gap-2">
+        <div className="pointer-events-auto flex items-start justify-between gap-2">
           <div className="pointer-events-auto flex min-w-0 items-center gap-2">
             <Link
               aria-label="Voltar para a pagina inicial"
-              className="grid size-11 shrink-0 place-items-center rounded-md bg-white/95 text-slate-900 shadow-md ring-1 ring-slate-900/10 transition hover:bg-white sm:size-10"
+              className="grid size-10 shrink-0 place-items-center rounded-md bg-white/78 text-slate-900 shadow-md ring-1 ring-slate-900/10 backdrop-blur-sm transition hover:bg-white/90 sm:size-9"
               href="/"
               prefetch={false}
               title="Voltar"
             >
               <ArrowLeft size={20} />
             </Link>
-            <div className="min-w-0 rounded-md bg-white/95 px-3 py-2 shadow-md ring-1 ring-slate-900/10 sm:px-4 sm:py-2.5">
+            <div className="min-w-0 rounded-md bg-white/78 px-3 py-1.5 shadow-md ring-1 ring-slate-900/10 backdrop-blur-sm sm:px-3.5 sm:py-2">
               <p className="truncate text-[10px] font-black uppercase tracking-[0.12em] text-sky-700 sm:text-[11px]">
                 Tour 3D interativo
               </p>
@@ -207,7 +216,7 @@ export function TourOverlay({
             </div>
           </div>
 
-          <div className="pointer-events-auto flex shrink-0 gap-2">
+          <div className="pointer-events-auto flex shrink-0 items-start gap-2">
             {!isMobile ? (
               <ModeSwitcher
                 className="flex"
@@ -216,27 +225,68 @@ export function TourOverlay({
                 onModeChange={onModeChange}
               />
             ) : null}
-            <IconButton
-              disabled={!isLoaded}
-              label="Reiniciar vista"
-              onClick={onReset}
-            >
-              <RotateCcw size={18} />
-            </IconButton>
-            <IconButton
-              label={
-                isFullscreen ? "Sair da tela cheia" : "Abrir em tela cheia"
-              }
-              onClick={onToggleFullscreen}
-            >
-              {isFullscreen ? (
-                <Minimize2 size={18} />
-              ) : (
-                <Maximize2 size={18} />
-              )}
-            </IconButton>
+            {isLoaded && (!isMobile || isMobileTourStarted) ? (
+              <TourVisualSettingsPanel
+                isOpen={visualSettingsOpen}
+                onChange={onVisualSettingsChange}
+                onOpenChange={setVisualSettingsOpen}
+                settings={visualSettings}
+              />
+            ) : null}
+            {!isMobile ? (
+              <>
+                <IconButton
+                  disabled={!isLoaded}
+                  label="Reiniciar vista"
+                  onClick={onReset}
+                >
+                  <RotateCcw size={17} />
+                </IconButton>
+                <IconButton
+                  label={
+                    isFullscreen
+                      ? "Sair da tela cheia"
+                      : "Abrir em tela cheia"
+                  }
+                  onClick={onToggleFullscreen}
+                >
+                  {isFullscreen ? (
+                    <Minimize2 size={17} />
+                  ) : (
+                    <Maximize2 size={17} />
+                  )}
+                </IconButton>
+              </>
+            ) : isMobileTourStarted ? (
+              <button
+                className="flex min-h-9 items-center gap-1.5 rounded-md bg-slate-950/68 px-3 text-[11px] font-black text-white shadow-md ring-1 ring-white/20 backdrop-blur-sm"
+                onClick={onExitMobileTour}
+                type="button"
+              >
+                <LogOut size={15} />
+                Sair
+              </button>
+            ) : null}
           </div>
         </div>
+
+        {isLoaded && isMobile && isMobileTourStarted && !error ? (
+          <div
+            className="pointer-events-none absolute left-1/2 -translate-x-1/2"
+            style={{
+              top: isPortrait
+                ? "max(4.5rem, env(safe-area-inset-top))"
+                : "max(0.75rem, env(safe-area-inset-top))",
+            }}
+          >
+            <ModeSwitcher
+              className="flex w-[240px]"
+              isLoaded={isLoaded}
+              mode={mode}
+              onModeChange={onModeChange}
+            />
+          </div>
+        ) : null}
 
         {!isLoaded && !error ? (
           <div
@@ -282,31 +332,27 @@ export function TourOverlay({
 
         {isLoaded &&
         isMobile &&
-        (!isMobileTourStarted || isPortrait) &&
+        !isMobileTourStarted &&
         !error ? (
           <div
-            className="pointer-events-auto absolute left-1/2 top-1/2 w-[min(84vw,340px)] -translate-x-1/2 -translate-y-1/2 rounded-lg bg-slate-950/94 p-5 text-center text-white shadow-2xl ring-1 ring-white/20"
+            className="pointer-events-auto absolute left-1/2 top-1/2 w-[min(84vw,340px)] -translate-x-1/2 -translate-y-1/2 rounded-md bg-slate-950/82 p-5 text-center text-white shadow-2xl ring-1 ring-white/20 backdrop-blur-sm"
             onContextMenu={(event) => event.preventDefault()}
           >
-            <RotateCw className="mx-auto text-cyan-300" size={30} />
+            <Play className="mx-auto text-cyan-300" size={28} />
             <p className="mt-3 text-base font-black">
-              {isMobileTourStarted
-                ? "Gire o celular para continuar"
-                : "Iniciar tour em tela horizontal"}
+              Iniciar navegacao
             </p>
             <p className="mt-1.5 text-xs font-semibold leading-5 text-white/65">
-              A navegacao foi preparada para o telefone deitado.
+              O passeio tentara abrir em tela cheia e no formato horizontal.
             </p>
-            {!isMobileTourStarted ? (
-              <button
-                className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-cyan-400 px-4 text-sm font-black text-slate-950"
-                onClick={onStartMobileTour}
-                type="button"
-              >
-                <Play size={18} />
-                Entrar no passeio
-              </button>
-            ) : null}
+            <button
+              className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-cyan-400 px-4 text-sm font-black text-slate-950"
+              onClick={onStartMobileTour}
+              type="button"
+            >
+              <Play size={18} />
+              Entrar no passeio
+            </button>
           </div>
         ) : null}
 
@@ -332,7 +378,6 @@ export function TourOverlay({
         {isLoaded &&
         isMobile &&
         isMobileTourStarted &&
-        !isPortrait &&
         mode === "walk" ? (
           <div className="mt-auto">
             <MobileTourControls
@@ -346,22 +391,15 @@ export function TourOverlay({
           <div className="mt-auto" />
         )}
 
-        {isMobile && isMobileTourStarted && !isPortrait ? (
-          <ModeSwitcher
-            className="mx-auto flex w-[min(48vw,240px)]"
-            isLoaded={isLoaded}
-            mode={mode}
-            onModeChange={onModeChange}
-          />
-        ) : null}
       </div>
 
       {isLoaded &&
       !error &&
-      (!isMobile || (isMobileTourStarted && !isPortrait)) ? (
+      (!isMobile || isMobileTourStarted) ? (
         <EntranceGuidePanel
           activeRoute={activeRoute}
           initiallyOpen={!isMobile}
+          isPortrait={isPortrait}
           isPointerLocked={isPointerLocked}
           onNavigate={onNavigate}
           onResumeWalk={() => onModeChange("walk")}

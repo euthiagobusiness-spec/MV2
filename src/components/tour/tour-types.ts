@@ -6,6 +6,19 @@ export type VerticalDirection = "down" | "up";
 
 export type NormalizedTourPoint = [x: number, z: number];
 
+export type TourMsaaSamples = 0 | 2 | 4;
+
+export type TourVisualPreset = "natural" | "vibrant" | "soft";
+
+export type TourVisualSettings = {
+  contrast: number;
+  exposure: number;
+  lightIntensity: number;
+  msaaSamples: TourMsaaSamples;
+  preset: TourVisualPreset;
+  saturation: number;
+};
+
 export type TourDestinationId =
   | "barbecue"
   | "parking-square"

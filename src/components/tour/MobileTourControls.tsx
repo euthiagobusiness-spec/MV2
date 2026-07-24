@@ -53,7 +53,7 @@ function HoldAction({
   return (
     <button
       aria-label={label}
-      className="grid size-12 touch-none place-items-center rounded-md bg-slate-950/88 text-white shadow-lg ring-1 ring-white/25 active:bg-sky-700"
+      className="grid size-11 touch-none place-items-center rounded-md bg-slate-950/68 text-white shadow-lg ring-1 ring-white/20 backdrop-blur-sm active:bg-sky-700/90"
       onContextMenu={(event) => event.preventDefault()}
       onLostPointerCapture={() => onActiveChange(false)}
       onPointerCancel={release}
@@ -115,7 +115,7 @@ function MovementJoystick({
   return (
     <button
       aria-label="Controle direcional"
-      className="relative size-[112px] shrink-0 touch-none rounded-full border border-white/25 bg-slate-950/55 shadow-xl backdrop-blur-sm"
+      className="relative size-[108px] shrink-0 touch-none rounded-full border border-white/20 bg-slate-950/42 shadow-xl backdrop-blur-sm"
       onContextMenu={(event) => event.preventDefault()}
       onLostPointerCapture={() => release()}
       onPointerCancel={release}
@@ -145,9 +145,11 @@ function MovementJoystick({
       />
       <span
         aria-hidden="true"
-        className="absolute left-1/2 top-1/2 grid size-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-white/30 bg-sky-600 text-[10px] font-black text-white shadow-lg"
+        className="absolute grid size-11 place-items-center rounded-full border border-white/30 bg-sky-600/92 text-center text-[11px] font-black leading-none text-white shadow-lg"
         style={{
-          transform: `translate(calc(-50% + ${position.x}px), calc(-50% + ${position.y}px))`,
+          left: `calc(50% + ${position.x}px)`,
+          top: `calc(50% + ${position.y}px)`,
+          transform: "translate(-50%, -50%)",
         }}
       >
         5x
@@ -167,14 +169,19 @@ export function MobileTourControls({
       aria-label="Controles de caminhada"
       className="pointer-events-auto flex w-full items-end justify-between gap-5"
       onContextMenu={(event) => event.preventDefault()}
+      style={{
+        WebkitTouchCallout: "none",
+        WebkitUserSelect: "none",
+        userSelect: "none",
+      }}
     >
       <MovementJoystick onMovementChange={onMovementChange} />
 
       <div className="grid grid-cols-2 gap-2">
         <button
           aria-pressed={isRunning}
-          className={`col-span-2 flex min-h-11 items-center justify-center gap-2 rounded-md px-3 text-xs font-black text-white shadow-lg ring-1 ring-white/25 ${
-            isRunning ? "bg-sky-600" : "bg-slate-950/88"
+          className={`col-span-2 flex min-h-10 items-center justify-center gap-2 rounded-md px-3 text-xs font-black text-white shadow-lg ring-1 ring-white/20 backdrop-blur-sm ${
+            isRunning ? "bg-sky-600/92" : "bg-slate-950/68"
           }`}
           onClick={onRunToggle}
           onContextMenu={(event) => event.preventDefault()}

@@ -5,8 +5,20 @@ import { useEffect, useRef, useState } from "react";
 import { TourOverlay } from "@/components/tour/TourOverlay";
 import { useCondominiumTour } from "@/components/tour/useCondominiumTour";
 
+type TourOrientation = "landscape" | "portrait";
+
 type LockableOrientation = ScreenOrientation & {
-  lock?: (orientation: "landscape") => Promise<void>;
+  lock?: (orientation: TourOrientation) => Promise<void>;
+  unlock?: () => void;
+};
+
+type FullscreenDocument = Document & {
+  webkitExitFullscreen?: () => Promise<void> | void;
+  webkitFullscreenElement?: Element | null;
+};
+
+type FullscreenElement = HTMLElement & {
+  webkitRequestFullscreen?: () => Promise<void> | void;
 };
 
 export function CondominiumTour() {
@@ -30,20 +42,41 @@ export function CondominiumTour() {
     selectMode,
     toggleRunning,
     updateMobileMovement,
+    updateVisualSettings,
     updateVerticalDirection,
+    visualSettings,
   } = useCondominiumTour();
 
   useEffect(() => {
     const updateFullscreenState = () => {
-      setIsFullscreen(document.fullscreenElement === sectionRef.current);
+      const fullscreenDocument = document as FullscreenDocument;
+      const fullscreenElement =
+        document.fullscreenElement ??
+        fullscreenDocument.webkitFullscreenElement ??
+        null;
+      const tourIsFullscreen = fullscreenElement === sectionRef.current;
+
+      setIsFullscreen(tourIsFullscreen);
+      if (!fullscreenElement) {
+        setIsMobileTourStarted(false);
+      }
     };
 
     document.addEventListener("fullscreenchange", updateFullscreenState);
-    return () =>
+    document.addEventListener(
+      "webkitfullscreenchange",
+      updateFullscreenState,
+    );
+    return () => {
       document.removeEventListener(
         "fullscreenchange",
         updateFullscreenState,
       );
+      document.removeEventListener(
+        "webkitfullscreenchange",
+        updateFullscreenState,
+      );
+    };
   }, []);
 
   useEffect(() => {
@@ -75,35 +108,53 @@ export function CondominiumTour() {
     };
   }, []);
 
-  const lockLandscape = async () => {
+  const lockOrientation = async (value: TourOrientation) => {
     const orientation = screen.orientation as
       | LockableOrientation
       | undefined;
 
     try {
-      await orientation?.lock?.("landscape");
+      await orientation?.lock?.(value);
     } catch {
-      // Browsers without orientation locking keep the rotate-device gate.
+      // Orientation locking is best-effort outside installed web apps.
     }
   };
 
+  const requestTourFullscreen = async () => {
+    const tourElement = sectionRef.current as FullscreenElement | null;
+
+    if (!tourElement) {
+      return;
+    }
+
+    if (tourElement.requestFullscreen) {
+      await tourElement.requestFullscreen({
+        navigationUI: "hide",
+      });
+      return;
+    }
+
+    await tourElement.webkitRequestFullscreen?.();
+  };
+
   const startMobileTour = async () => {
-    const tourElement = sectionRef.current;
-
     selectMode("walk");
+    setIsMobileTourStarted(true);
 
-    if (tourElement && !document.fullscreenElement) {
+    const fullscreenDocument = document as FullscreenDocument;
+    const fullscreenElement =
+      document.fullscreenElement ??
+      fullscreenDocument.webkitFullscreenElement;
+
+    if (!fullscreenElement) {
       try {
-        await tourElement.requestFullscreen({
-          navigationUI: "hide",
-        });
+        await requestTourFullscreen();
       } catch {
-        // iOS Safari can reject element fullscreen; landscape still works.
+        // iPhone Safari can reject element fullscreen for regular sites.
       }
     }
 
-    await lockLandscape();
-    setIsMobileTourStarted(true);
+    await lockOrientation("landscape");
   };
 
   const toggleFullscreen = async () => {
@@ -117,13 +168,32 @@ export function CondominiumTour() {
       if (document.fullscreenElement) {
         await document.exitFullscreen();
       } else {
-        await tourElement.requestFullscreen();
+        await requestTourFullscreen();
         if (isMobile) {
-          await lockLandscape();
+          await lockOrientation("landscape");
         }
       }
     } catch {
       // Some mobile browsers expose the API but still reject the request.
+    }
+  };
+
+  const exitMobileTour = async () => {
+    updateMobileMovement(0, 0);
+    setIsMobileTourStarted(false);
+    selectMode("overview");
+    await lockOrientation("portrait");
+
+    const fullscreenDocument = document as FullscreenDocument;
+
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else if (fullscreenDocument.webkitFullscreenElement) {
+        await fullscreenDocument.webkitExitFullscreen?.();
+      }
+    } catch {
+      // The interface still returns to its initial state.
     }
   };
 
@@ -144,13 +214,19 @@ export function CondominiumTour() {
     >
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-cover bg-center"
+        className={`pointer-events-none absolute inset-0 bg-cover bg-center transition-opacity duration-500 ${
+          isLoaded ? "opacity-0" : "opacity-100"
+        }`}
         style={{
           backgroundImage:
             "url('/uploads/condominium/084657bf-ecb2-4fd3-971b-4e7ff02a14fe.jpg')",
         }}
       />
-      <div className="absolute inset-0 bg-slate-950/18" />
+      <div
+        className={`absolute inset-0 bg-slate-950/18 transition-opacity duration-500 ${
+          isLoaded ? "opacity-0" : "opacity-100"
+        }`}
+      />
       <div className="absolute inset-0 z-[1]" ref={mountRef} />
       <TourOverlay
         activeRoute={activeRoute}
@@ -167,12 +243,15 @@ export function CondominiumTour() {
         onModeChange={selectMode}
         onMobileMovementChange={updateMobileMovement}
         onNavigate={navigateTo}
+        onExitMobileTour={exitMobileTour}
         onReset={resetView}
         onRetry={() => window.location.reload()}
         onRunToggle={toggleRunning}
         onStartMobileTour={startMobileTour}
         onToggleFullscreen={toggleFullscreen}
+        onVisualSettingsChange={updateVisualSettings}
         onVerticalDirectionChange={updateVerticalDirection}
+        visualSettings={visualSettings}
       />
     </section>
   );
